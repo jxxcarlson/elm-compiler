@@ -26,7 +26,7 @@ import qualified Text.Read as Read
 
 import qualified Elm.Version as V
 import Terminal.Internal
-import qualified Terminal.Chomp as Chomp
+import qualified Terminal.Chomp as Chomp (chomp, getFlagNames)
 import qualified Terminal.Error as Error
 
 
@@ -38,22 +38,30 @@ _command :: String -> P.Doc -> Args args -> Flags flags -> (args -> flags -> IO 
 _command details example args_ flags_ callback =
   do  setLocaleEncoding utf8
       argStrings <- Env.getArgs
+      putStrLn $ "DEBUG: Received arguments: " ++ show argStrings
       case argStrings of
         ["--version"] ->
           do  hPutStrLn stdout (V.toChars V.compiler)
               Exit.exitSuccess
 
         chunks ->
-          if elem "--help" chunks then
+          if "--help" `elem` chunks then
             Error.exitWithHelp Nothing details example args_ flags_
 
           else
-            case snd $ Chomp.chomp Nothing chunks args_ flags_ of
-              Right (argsValue, flagValue) ->
-                callback argsValue flagValue
+            do
+              putStrLn $ "DEBUG: Processing chunks: " ++ show chunks
+              putStrLn $ "DEBUG: Available flags: " ++ show (Chomp.getFlagNames flags_ [])
+              case snd $ Chomp.chomp Nothing chunks args_ flags_ of
+                Right (argsValue, flagValue) ->
+                  do
+                    putStrLn "DEBUG: Successfully parsed flags"
+                    callback argsValue flagValue
 
-              Left err ->
-                Error.exitWithError err
+                Left err ->
+                  do
+                    putStrLn "DEBUG: Failed to parse flags"
+                    Error.exitWithError err
 
 
 

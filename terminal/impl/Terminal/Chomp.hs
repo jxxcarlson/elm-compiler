@@ -1,31 +1,46 @@
 {-# LANGUAGE GADTs, Rank2Types #-}
 module Terminal.Chomp
   ( chomp
+  , getFlagNames
   )
   where
 
 
 import qualified Data.List as List
+import qualified Data.Text as Text
 
 import Terminal.Error
-import Terminal.Internal
+import qualified Terminal.Internal as TI (Args(..), Flags(..), Flag(..), Parser(..), CompleteArgs(..), RequiredArgs(..), _singular, _examples)
 
 
 
 -- CHOMP INTERFACE
 
 
-chomp :: Maybe Int -> [String] -> Args args -> Flags flags -> ( IO [String], Either Error (args, flags) )
+chomp :: Maybe Int -> [String] -> TI.Args args -> TI.Flags flags -> ( IO [String], Either Error (args, flags) )
 chomp maybeIndex strings args flags =
   let
     (Chomper flagChomper) =
       chompFlags flags
 
     ok suggest chunks flagValue =
-      fmap (flip (,) flagValue) <$> chompArgs suggest chunks args
+      let
+        (s1, result) = chompArgs suggest chunks args
+      in
+      case result of
+        Left argError ->
+          ( addSuggest (return []) suggest
+          , Left (BadArgs [])
+          )
+        Right argsValue ->
+          ( addSuggest (return []) suggest
+          , Right (argsValue, flagValue)
+          )
 
     err suggest flagError =
-      ( addSuggest (return []) suggest, Left (BadFlag flagError) )
+      ( addSuggest (return []) suggest
+      , Left (BadFlag flagError)
+      )
   in
   flagChomper (toSuggest maybeIndex) (toChunks strings) ok err
 
@@ -90,12 +105,12 @@ makeSuggestion suggest maybeUpdate =
 -- ARGS
 
 
-chompArgs :: Suggest -> [Chunk] -> Args a -> (IO [String], Either Error a)
-chompArgs suggest chunks (Args completeArgsList) =
+chompArgs :: Suggest -> [Chunk] -> TI.Args a -> (IO [String], Either Error a)
+chompArgs suggest chunks (TI.Args completeArgsList) =
   chompArgsHelp suggest chunks completeArgsList [] []
 
 
-chompArgsHelp :: Suggest -> [Chunk] -> [CompleteArgs a] -> [Suggest] -> [(CompleteArgs a, ArgError)] -> (IO [String], Either Error a)
+chompArgsHelp :: Suggest -> [Chunk] -> [TI.CompleteArgs a] -> [Suggest] -> [(TI.CompleteArgs a, ArgError)] -> (IO [String], Either Error a)
 chompArgsHelp suggest chunks completeArgsList revSuggest revArgErrors =
   case completeArgsList of
     [] ->
@@ -131,19 +146,19 @@ addSuggest everything suggest =
 -- COMPLETE ARGS
 
 
-chompCompleteArgs :: Suggest -> [Chunk] -> CompleteArgs a -> (Suggest, Either ArgError a)
+chompCompleteArgs :: Suggest -> [Chunk] -> TI.CompleteArgs a -> (Suggest, Either ArgError a)
 chompCompleteArgs suggest chunks completeArgs =
   let
     numChunks = length chunks
   in
   case completeArgs of
-    Exactly requiredArgs ->
+    TI.Exactly requiredArgs ->
       chompExactly suggest chunks (chompRequiredArgs numChunks requiredArgs)
 
-    Optional requiredArgs parser ->
+    TI.Optional requiredArgs parser ->
       chompOptional suggest chunks (chompRequiredArgs numChunks requiredArgs) parser
 
-    Multiple requiredArgs parser ->
+    TI.Multiple requiredArgs parser ->
       chompMultiple suggest chunks (chompRequiredArgs numChunks requiredArgs) parser
 
 
@@ -161,7 +176,7 @@ chompExactly suggest chunks (Chomper chomper) =
   chomper suggest chunks ok err
 
 
-chompOptional :: Suggest -> [Chunk] -> Chomper ArgError (Maybe a -> b) -> Parser a -> (Suggest, Either ArgError b)
+chompOptional :: Suggest -> [Chunk] -> Chomper ArgError (Maybe a -> b) -> TI.Parser a -> (Suggest, Either ArgError b)
 chompOptional suggest chunks (Chomper chomper) parser =
   let
     ok s1 cs func =
@@ -185,7 +200,7 @@ chompOptional suggest chunks (Chomper chomper) parser =
   chomper suggest chunks ok err
 
 
-chompMultiple :: Suggest -> [Chunk] -> Chomper ArgError ([a] -> b) -> Parser a -> (Suggest, Either ArgError b)
+chompMultiple :: Suggest -> [Chunk] -> Chomper ArgError ([a] -> b) -> TI.Parser a -> (Suggest, Either ArgError b)
 chompMultiple suggest chunks (Chomper chomper) parser =
   let
     err s1 argError =
@@ -194,7 +209,7 @@ chompMultiple suggest chunks (Chomper chomper) parser =
   chomper suggest chunks (chompMultipleHelp parser []) err
 
 
-chompMultipleHelp :: Parser a -> [a] -> Suggest -> [Chunk] -> ([a] -> b) -> (Suggest, Either ArgError b)
+chompMultipleHelp :: TI.Parser a -> [a] -> Suggest -> [Chunk] -> ([a] -> b) -> (Suggest, Either ArgError b)
 chompMultipleHelp parser revArgs suggest chunks func =
   case chunks of
     [] ->
@@ -213,20 +228,20 @@ chompMultipleHelp parser revArgs suggest chunks func =
 -- REQUIRED ARGS
 
 
-chompRequiredArgs :: Int -> RequiredArgs a -> Chomper ArgError a
+chompRequiredArgs :: Int -> TI.RequiredArgs a -> Chomper ArgError a
 chompRequiredArgs numChunks args =
   case args of
-    Done value ->
+    TI.Done value ->
       return value
 
-    Required funcArgs argParser ->
+    TI.Required funcArgs argParser ->
       do  func <- chompRequiredArgs numChunks funcArgs
           arg <- chompArg numChunks argParser
           return (func arg)
 
 
-chompArg :: Int -> Parser a -> Chomper ArgError a
-chompArg numChunks parser@(Parser singular _ _ _ toExamples) =
+chompArg :: Int -> TI.Parser a -> Chomper ArgError a
+chompArg numChunks parser@(TI.Parser singular _ _ _ toExamples) =
   Chomper $ \suggest chunks ok err ->
     case chunks of
       [] ->
@@ -245,8 +260,8 @@ chompArg numChunks parser@(Parser singular _ _ _ toExamples) =
             ok newSuggest otherChunks arg
 
 
-suggestArg :: Parser a -> Int -> Int -> Maybe (IO [String])
-suggestArg (Parser _ _ _ toSuggestions _) numChunks targetIndex =
+suggestArg :: TI.Parser a -> Int -> Int -> Maybe (IO [String])
+suggestArg (TI.Parser _ _ _ toSuggestions _) numChunks targetIndex =
   if numChunks <= targetIndex then
     Just (toSuggestions "")
   else
@@ -257,8 +272,8 @@ suggestArg (Parser _ _ _ toSuggestions _) numChunks targetIndex =
 -- PARSER
 
 
-tryToParse :: Suggest -> Parser a -> Int -> String -> (Suggest, Either Expectation a)
-tryToParse suggest (Parser singular _ parse toSuggestions toExamples) index string =
+tryToParse :: Suggest -> TI.Parser a -> Int -> String -> (Suggest, Either Expectation a)
+tryToParse suggest (TI.Parser singular _ parse toSuggestions toExamples) index string =
   let
     newSuggest =
       makeSuggestion suggest $ \targetIndex ->
@@ -279,84 +294,62 @@ tryToParse suggest (Parser singular _ parse toSuggestions toExamples) index stri
 -- FLAGS
 
 
-chompFlags :: Flags a -> Chomper FlagError a
+chompFlags :: TI.Flags a -> Chomper FlagError a
 chompFlags flags =
   do  value <- chompFlagsHelp flags
       checkForUnknownFlags flags
       return value
 
 
-chompFlagsHelp :: Flags a -> Chomper FlagError a
+chompFlagsHelp :: TI.Flags a -> Chomper FlagError a
 chompFlagsHelp flags =
   case flags of
-    FDone value ->
+    TI.FDone value ->
       return value
 
-    FMore funcFlags argFlag ->
-      do  func <- chompFlagsHelp funcFlags
-          arg <- chompFlag argFlag
-          return (func arg)
+    TI.FMore more flag ->
+      do  func <- chompFlagsHelp more
+          value <- chompFlag flag
+          return (func value)
 
 
 
 -- FLAG
 
 
-chompFlag :: Flag a -> Chomper FlagError a
+chompFlag :: TI.Flag a -> Chomper FlagError a
 chompFlag flag =
   case flag of
-    OnOff flagName _ ->
-      chompOnOffFlag flagName
+    TI.Flag name parser _ ->
+      Chomper $ \suggest chunks ok err ->
+        case chunks of
+          [] ->
+            ok suggest chunks Nothing
 
-    Flag flagName parser _ ->
-      chompNormalFlag flagName parser
+          Chunk index string : otherChunks ->
+            if string == "--" ++ name
+            then
+              case TI._parser parser string of
+                Nothing ->
+                  err suggest (FlagWithBadValue ("--" ++ name) string (Expectation (TI._singular parser) (TI._examples parser "")))
 
+                Just value ->
+                  ok suggest otherChunks (Just value)
+            else
+              ok suggest chunks Nothing
 
-chompOnOffFlag :: String -> Chomper FlagError Bool
-chompOnOffFlag flagName =
-  Chomper $ \suggest chunks ok err ->
-    case findFlag flagName chunks of
-      Nothing ->
-        ok suggest chunks False
+    TI.OnOff name _ ->
+      Chomper $ \suggest chunks ok err ->
+        case chunks of
+          [] ->
+            ok suggest chunks False
 
-      Just (FoundFlag before value after) ->
-        case value of
-          DefNope ->
-            ok suggest (before ++ after) True
-
-          Possibly chunk ->
-            ok suggest (before ++ chunk : after) True
-
-          Definitely _ string ->
-            err suggest (FlagWithValue flagName string)
-
-
-chompNormalFlag :: String -> Parser a -> Chomper FlagError (Maybe a)
-chompNormalFlag flagName parser@(Parser singular _ _ _ toExamples) =
-  Chomper $ \suggest chunks ok err ->
-    case findFlag flagName chunks of
-      Nothing ->
-        ok suggest chunks Nothing
-
-      Just (FoundFlag before value after) ->
-        let
-          attempt index string =
-            case tryToParse suggest parser index string of
-              (newSuggest, Left expectation) ->
-                err newSuggest (FlagWithBadValue flagName string expectation)
-
-              (newSuggest, Right flagValue) ->
-                ok newSuggest (before ++ after) (Just flagValue)
-        in
-        case value of
-          Definitely index string ->
-            attempt index string
-
-          Possibly (Chunk index string) ->
-            attempt index string
-
-          DefNope ->
-            err suggest (FlagWithNoValue flagName (Expectation singular (toExamples "")))
+          Chunk index string : otherChunks ->
+            if string == "--" ++ name
+            then
+              ok suggest otherChunks True
+            else
+              ok suggest chunks False
 
 
 
@@ -418,7 +411,7 @@ findFlagHelp revPrev loneFlag flagPrefix chunks =
 -- CHECK FOR UNKNOWN FLAGS
 
 
-checkForUnknownFlags :: Flags a -> Chomper FlagError ()
+checkForUnknownFlags :: TI.Flags a -> Chomper FlagError ()
 checkForUnknownFlags flags =
   Chomper $ \suggest chunks ok err ->
     case filter startsWithDash chunks of
@@ -431,7 +424,7 @@ checkForUnknownFlags flags =
           (FlagUnknown unknownFlag flags)
 
 
-suggestFlag :: [Chunk] -> Flags a -> Int -> Maybe (IO [String])
+suggestFlag :: [Chunk] -> TI.Flags a -> Int -> Maybe (IO [String])
 suggestFlag unknownFlags flags targetIndex =
   case unknownFlags of
     [] ->
@@ -449,23 +442,23 @@ startsWithDash (Chunk _ string) =
   List.isPrefixOf "-" string
 
 
-getFlagNames :: Flags a -> [String] -> [String]
+getFlagNames :: TI.Flags a -> [String] -> [String]
 getFlagNames flags names =
   case flags of
-    FDone _ ->
+    TI.FDone _ ->
       "--help" : names
 
-    FMore subFlags flag ->
+    TI.FMore subFlags flag ->
       getFlagNames subFlags (getFlagName flag : names)
 
 
-getFlagName :: Flag a -> String
+getFlagName :: TI.Flag a -> String
 getFlagName flag =
   case flag of
-    Flag name _ _ ->
+    TI.Flag name _ _ ->
       "--" ++ name
 
-    OnOff name _ ->
+    TI.OnOff name _ ->
       "--" ++ name
 
 

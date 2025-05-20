@@ -50,16 +50,19 @@ data Flags =
     , _docs :: Maybe FilePath
     , _rawAst :: Bool --added by JC 
     }
+  deriving (Show)
 
 
 data Output
   = JS FilePath
   | Html FilePath
   | DevNull
+  deriving (Show)
 
 
 data ReportType
   = Json
+  deriving (Show)
 
 
 
@@ -70,9 +73,14 @@ type Task a = Task.Task Exit.Make a
 
 
 run :: [FilePath] -> Flags -> IO ()
-run paths flags@(Flags _ _ _ report _ _rawAst) =
-  do  style <- getStyle report
+run paths flags@(Flags debug optimize output report docs rawAst) =
+  do  putStrLn "DEBUG: This is the custom Elm compiler"
+      writeFile "make_debug.txt" "reached run\n"
+      putStrLn $ "DEBUG: rawAst flag value: " ++ show rawAst
+      putStrLn $ "DEBUG: debug=" ++ show debug ++ ", optimize=" ++ show optimize ++ ", output=" ++ show output ++ ", report=" ++ show report ++ ", docs=" ++ show docs
+      style <- getStyle report
       maybeRoot <- Stuff.findRoot
+      putStrLn "DEBUG: Before Reporting.attemptWithStyle"
       Reporting.attemptWithStyle style Exit.makeToReport $
         case maybeRoot of
           Just root -> runHelp root paths style flags
@@ -80,12 +88,13 @@ run paths flags@(Flags _ _ _ report _ _rawAst) =
 
 
 runHelp :: FilePath -> [FilePath] -> Reporting.Style -> Flags -> IO (Either Exit.Make ())
-runHelp root paths style (Flags debug optimize maybeOutput _ maybeDocs _rawAst) =
+runHelp root paths style (Flags debug optimize maybeOutput _ maybeDocs rawAst) =
   BW.withScope $ \scope ->
   Stuff.withRootLock root $ Task.run $
   do  desiredMode <- getMode debug optimize
       details <- Task.eio Exit.MakeBadDetails (Details.load style scope root)
-      if _rawAst
+      Task.io $ writeFile "make_debug.txt" "DEBUG: Before raw-ast check\n"
+      if rawAst
         then do
           artifacts <- buildPaths style root details (NE.List (head paths) (tail paths))
           let moduleName = Name.fromChars $ FP.dropExtension $ FP.takeFileName (head paths)
@@ -94,7 +103,10 @@ runHelp root paths style (Flags debug optimize maybeOutput _ maybeDocs _rawAst) 
             Just _ -> do
               source <- Task.io $ BS.readFile (head paths)
               case Parse.fromByteString Parse.Application source of
-                Right srcModule -> Task.io $ putStrLn $ AST.Pretty.Raw.pretty AST.Pretty.Raw.defaultConfig srcModule
+                Right srcModule -> do
+                  Task.io $ putStrLn "DEBUG: top-level before pretty"
+                  prettyOutput <- Task.io $ AST.Pretty.Raw.pretty AST.Pretty.Raw.defaultConfig srcModule
+                  Task.io $ putStrLn prettyOutput
                 Left err -> Task.throw $ Exit.MakeCannotBuild (Exit.BuildBadModules (head paths) (Error.Module (Name.fromChars $ FP.dropExtension $ FP.takeFileName (head paths)) (head paths) (File.zeroTime) (BS.empty) (Error.BadSyntax err)) [])
             Nothing -> Task.throw Exit.MakeNoMain
         else do
