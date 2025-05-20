@@ -74,13 +74,8 @@ type Task a = Task.Task Exit.Make a
 
 run :: [FilePath] -> Flags -> IO ()
 run paths flags@(Flags debug optimize output report docs rawAst) =
-  do  putStrLn "DEBUG: This is the custom Elm compiler"
-      writeFile "make_debug.txt" "reached run\n"
-      putStrLn $ "DEBUG: rawAst flag value: " ++ show rawAst
-      putStrLn $ "DEBUG: debug=" ++ show debug ++ ", optimize=" ++ show optimize ++ ", output=" ++ show output ++ ", report=" ++ show report ++ ", docs=" ++ show docs
-      style <- getStyle report
+  do  style <- getStyle report
       maybeRoot <- Stuff.findRoot
-      putStrLn "DEBUG: Before Reporting.attemptWithStyle"
       Reporting.attemptWithStyle style Exit.makeToReport $
         case maybeRoot of
           Just root -> runHelp root paths style flags
@@ -93,7 +88,6 @@ runHelp root paths style (Flags debug optimize maybeOutput _ maybeDocs rawAst) =
   Stuff.withRootLock root $ Task.run $
   do  desiredMode <- getMode debug optimize
       details <- Task.eio Exit.MakeBadDetails (Details.load style scope root)
-      Task.io $ writeFile "make_debug.txt" "DEBUG: Before raw-ast check\n"
       if rawAst
         then do
           artifacts <- buildPaths style root details (NE.List (head paths) (tail paths))
@@ -104,7 +98,6 @@ runHelp root paths style (Flags debug optimize maybeOutput _ maybeDocs rawAst) =
               source <- Task.io $ BS.readFile (head paths)
               case Parse.fromByteString Parse.Application source of
                 Right srcModule -> do
-                  Task.io $ putStrLn "DEBUG: top-level before pretty"
                   prettyOutput <- Task.io $ AST.Pretty.Raw.pretty AST.Pretty.Raw.defaultConfig srcModule
                   Task.io $ putStrLn prettyOutput
                 Left err -> Task.throw $ Exit.MakeCannotBuild (Exit.BuildBadModules (head paths) (Error.Module (Name.fromChars $ FP.dropExtension $ FP.takeFileName (head paths)) (head paths) (File.zeroTime) (BS.empty) (Error.BadSyntax err)) [])
