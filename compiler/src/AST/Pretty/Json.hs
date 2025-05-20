@@ -1,5 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
-module AST.Json
+module AST.PrettyJson
   ( toJson
   )
   where

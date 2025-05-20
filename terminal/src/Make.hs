@@ -31,6 +31,10 @@ import qualified Reporting.Task as Task
 import qualified Stuff
 import Terminal (Parser(..))
 import qualified AST.Pretty.Raw
+import qualified Data.Name as Name
+import qualified Parse.Module as Parse
+import qualified Data.ByteString as BS
+import qualified Reporting.Error as Error
 
 
 
@@ -44,7 +48,7 @@ data Flags =
     , _output :: Maybe Output
     , _report :: Maybe ReportType
     , _docs :: Maybe FilePath
-    , _rawAst :: Bool
+    , _rawAst :: Bool --added by JC 
     }
 
 
@@ -83,8 +87,16 @@ runHelp root paths style (Flags debug optimize maybeOutput _ maybeDocs _rawAst) 
       details <- Task.eio Exit.MakeBadDetails (Details.load style scope root)
       if _rawAst
         then do
-          let modul = getMain (Build.Artifacts _ _ roots modules) root
-          putStrLn $ AST.Pretty.Raw.pretty AST.Pretty.Raw.defaultConfig modul
+          artifacts <- buildPaths style root details (NE.List (head paths) (tail paths))
+          let moduleName = Name.fromChars $ FP.dropExtension $ FP.takeFileName (head paths)
+          let modul = getMain (Build._modules artifacts) (Build.Inside moduleName)
+          case modul of
+            Just _ -> do
+              source <- Task.io $ BS.readFile (head paths)
+              case Parse.fromByteString Parse.Application source of
+                Right srcModule -> Task.io $ putStrLn $ AST.Pretty.Raw.pretty AST.Pretty.Raw.defaultConfig srcModule
+                Left err -> Task.throw $ Exit.MakeCannotBuild (Exit.BuildBadModules (head paths) (Error.Module (Name.fromChars $ FP.dropExtension $ FP.takeFileName (head paths)) (head paths) (File.zeroTime) (BS.empty) (Error.BadSyntax err)) [])
+            Nothing -> Task.throw Exit.MakeNoMain
         else do
           case paths of
             [] ->
