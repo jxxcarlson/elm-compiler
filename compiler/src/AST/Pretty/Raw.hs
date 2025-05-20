@@ -55,7 +55,6 @@ defaultConfig =
 pretty :: Config -> Src.Module -> IO String
 pretty config modul = do
     cwd <- getCurrentDirectory
-    appendFile (cwd ++ "/pretty_debug.txt") "DEBUG: AST.Pretty.Raw.pretty called\n"
     case format config of
         Text ->
             prettyText config modul
@@ -131,12 +130,9 @@ prettyExpr (A.At _ expr_) =
 
 prettyValue :: Config -> Src.Value -> String
 prettyValue config (Src.Value name patterns expr _) =
-    let -- rawPatterns = map (\(A.At _ p) -> p) patterns
-        -- rawExpr = let (A.At _ e) = expr in e
-        debugOutput = "[DEBUG] prettyValue called for " ++ ES.toChars (Name.toElmString (A.toValue name)) ++ "\n"
-    in debugOutput ++ "[Function] " ++ ES.toChars (Name.toElmString (A.toValue name)) ++
-       " with patterns: " ++ unwords (map prettyPattern patterns) ++
-       " = " ++ prettyExpr expr ++ "\n"
+    "[Function] " ++ ES.toChars (Name.toElmString (A.toValue name)) ++
+    " with patterns: " ++ unwords (map prettyPattern patterns) ++
+    " = " ++ prettyExpr expr ++ "\n"
 
 
 prettyUnions :: Config -> [Src.Union] -> String
