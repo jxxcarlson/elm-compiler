@@ -1,4 +1,3 @@
-
 Name: elm
 Version: 0.19.1
 
@@ -38,6 +37,8 @@ Executable elm
         ghc-options: -O2 -rtsopts -threaded "-with-rtsopts=-N -qg -A128m"
         -- add -eventlog for (elm make src/Main.elm +RTS -l; threadscope elm.eventlog)
         -- https://www.oreilly.com/library/view/parallel-and-concurrent/9781449335939/
+
+    default-language: Haskell2010
 
     Hs-Source-Dirs:
         compiler/src
@@ -127,6 +128,7 @@ Executable elm
         -- from compiler/
         AST.Canonical
         AST.Optimized
+        AST.Pretty.Raw
         AST.Source
         AST.Utils.Binop
         AST.Utils.Shader
@@ -202,7 +204,7 @@ Executable elm
     Build-depends:
         ansi-terminal,
         ansi-wl-pprint < 1,
-        base,
+        base >= 4.7 && < 5,
         binary,
         bytestring,
         containers,
@@ -232,4 +234,6 @@ Executable elm
         unordered-containers,
         utf8-string,
         vector,
-        zip-archive
+        zip-archive,
+        aeson >= 2.2.3.0,
+        text >= 2.0.2

@@ -30,6 +30,7 @@ import qualified Reporting.Exit as Exit
 import qualified Reporting.Task as Task
 import qualified Stuff
 import Terminal (Parser(..))
+import qualified AST.Pretty.Raw
 
 
 
@@ -43,6 +44,7 @@ data Flags =
     , _output :: Maybe Output
     , _report :: Maybe ReportType
     , _docs :: Maybe FilePath
+    , _rawAst :: Bool
     }
 
 
@@ -64,58 +66,63 @@ type Task a = Task.Task Exit.Make a
 
 
 run :: [FilePath] -> Flags -> IO ()
-run paths flags@(Flags _ _ _ report _) =
+run paths flags@(Flags _ _ _ report _ _rawAst) =
   do  style <- getStyle report
       maybeRoot <- Stuff.findRoot
       Reporting.attemptWithStyle style Exit.makeToReport $
         case maybeRoot of
           Just root -> runHelp root paths style flags
-          Nothing   -> return $ Left $ Exit.MakeNoOutline
+          Nothing   -> return (Left Exit.MakeNoOutline)
 
 
 runHelp :: FilePath -> [FilePath] -> Reporting.Style -> Flags -> IO (Either Exit.Make ())
-runHelp root paths style (Flags debug optimize maybeOutput _ maybeDocs) =
+runHelp root paths style (Flags debug optimize maybeOutput _ maybeDocs _rawAst) =
   BW.withScope $ \scope ->
   Stuff.withRootLock root $ Task.run $
   do  desiredMode <- getMode debug optimize
       details <- Task.eio Exit.MakeBadDetails (Details.load style scope root)
-      case paths of
-        [] ->
-          do  exposed <- getExposed details
-              buildExposed style root details maybeDocs exposed
+      if _rawAst
+        then do
+          let modul = getMain (Build.Artifacts _ _ roots modules) root
+          putStrLn $ AST.Pretty.Raw.pretty AST.Pretty.Raw.defaultConfig modul
+        else do
+          case paths of
+            [] ->
+              do  exposed <- getExposed details
+                  buildExposed style root details maybeDocs exposed
 
-        p:ps ->
-          do  artifacts <- buildPaths style root details (NE.List p ps)
-              case maybeOutput of
-                Nothing ->
-                  case getMains artifacts of
-                    [] ->
+            p:ps ->
+              do  artifacts <- buildPaths style root details (NE.List p ps)
+                  case maybeOutput of
+                    Nothing ->
+                      case getMains artifacts of
+                        [] ->
+                          return ()
+
+                        [name] ->
+                          do  builder <- toBuilder root details desiredMode artifacts
+                              generate style "index.html" (Html.sandwich name builder) (NE.List name [])
+
+                        name:names ->
+                          do  builder <- toBuilder root details desiredMode artifacts
+                              generate style "elm.js" builder (NE.List name names)
+
+                    Just DevNull ->
                       return ()
 
-                    [name] ->
-                      do  builder <- toBuilder root details desiredMode artifacts
-                          generate style "index.html" (Html.sandwich name builder) (NE.List name [])
+                    Just (JS target) ->
+                      case getNoMains artifacts of
+                        [] ->
+                          do  builder <- toBuilder root details desiredMode artifacts
+                              generate style target builder (Build.getRootNames artifacts)
 
-                    name:names ->
-                      do  builder <- toBuilder root details desiredMode artifacts
-                          generate style "elm.js" builder (NE.List name names)
+                        name:names ->
+                          Task.throw (Exit.MakeNonMainFilesIntoJavaScript name names)
 
-                Just DevNull ->
-                  return ()
-
-                Just (JS target) ->
-                  case getNoMains artifacts of
-                    [] ->
-                      do  builder <- toBuilder root details desiredMode artifacts
-                          generate style target builder (Build.getRootNames artifacts)
-
-                    name:names ->
-                      Task.throw (Exit.MakeNonMainFilesIntoJavaScript name names)
-
-                Just (Html target) ->
-                  do  name <- hasOneMain artifacts
-                      builder <- toBuilder root details desiredMode artifacts
-                      generate style target (Html.sandwich name builder) (NE.List name [])
+                    Just (Html target) ->
+                      do  name <- hasOneMain artifacts
+                          builder <- toBuilder root details desiredMode artifacts
+                          generate style target (Html.sandwich name builder) (NE.List name [])
 
 
 
