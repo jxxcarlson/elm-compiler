@@ -10,7 +10,7 @@ To play with it,
     where you use the correct path to the compiler
   - Let's call the alias `test-ast`.  Then cd to the the root of the repo and run `test-ast` to see the output of the AST.
 
-At the moment (May 21, this repo is little more than a skeleton of what we are aiming for. See TODO list below)
+At the moment (May 21), this repo is little more than a skeleton of what we are aiming for. See TODO list below)
 
 See NOTES.md for additional details.
 
