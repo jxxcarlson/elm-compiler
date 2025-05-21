@@ -26,6 +26,7 @@ import System.IO (appendFile)
 import System.Directory (getCurrentDirectory)
 import qualified Elm.Float as EF
 import qualified Data.ByteString.Builder as B
+import Data.List (intercalate)
 
 
 data Config =
@@ -117,7 +118,15 @@ prettyExpr (A.At _ expr_) =
         Src.Lambda patterns expr -> "\\" ++ unwords (map prettyPattern patterns) ++ " -> " ++ prettyExpr expr
         Src.Call func args -> prettyExpr func ++ " " ++ unwords (map prettyExpr args)
         Src.If branches expr -> "if " ++ unwords (map (\(cond, res) -> prettyExpr cond ++ " then " ++ prettyExpr res ++ " else ") branches) ++ prettyExpr expr
-        Src.Let defs expr -> "let ... in " ++ prettyExpr expr
+        Src.Let defs expr ->
+            "let " ++ intercalate "; " defStrings ++ " in " ++ prettyExpr expr
+            where
+                defStrings = map prettyDef defs
+                prettyDef (A.At _ def) = case def of
+                    Src.Define name patterns e _ ->
+                        ES.toChars (Name.toElmString (A.toValue name)) ++ " " ++ unwords (map prettyPattern patterns) ++ " = " ++ prettyExpr e
+                    Src.Destruct pat e ->
+                        prettyPattern pat ++ " = " ++ prettyExpr e
         Src.Case expr branches -> "case " ++ prettyExpr expr ++ " of ..."
         Src.Accessor name -> "." ++ ES.toChars (Name.toElmString name)
         Src.Access expr name -> prettyExpr expr ++ "." ++ ES.toChars (Name.toElmString (A.toValue name))

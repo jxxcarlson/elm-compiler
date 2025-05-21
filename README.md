@@ -4,11 +4,15 @@ This is a fork of the Elm compiler, an experiment in producing human-readble out
 To play with it, 
 
   - Clone this repo
-  - cd into it and rund `cabal build`
-  - Find the path to the binary and make an alias like this: PATH-TO-COMPILER make --raw-ast `
-  - Let's call the alias `elm-ast`.  Then cd to the folder where your program is (inhabited by `elm.json` and `src/`) and run `elm-ast src/Main.elm`
+  - cd into it and run `cabal build`
+  - Find the path to the binary and make an alias ls something like this,
+    `cd test-files/program1 && ../../dist-newstyle/build/aarch64-osx/ghc-9.6.7/elm-0.19.1/x/elm/build/elm/elm make --raw-ast src/Main.elm && cd -`
+    where you use the correct path to the compiler
+  - Let's call the alias `test-ast`.  Then cd to the the root of the repo and run `test-ast` to see the output of the AST.
 
 At the moment (May 20, this repo is little more than a skeleton of what we are aiming for. See TODO list below)
+
+See NOTES.md for additional details.
 
 ## TODO
 
