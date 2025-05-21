@@ -97,6 +97,122 @@ At the moment (May 20, this repo is little more than a skeleton of what we are a
 
 See NOTES.md for additional details.m See also [RAG REPO](https://github.com/jxxcarlson/github_repo_rag/blob/ragChunker/README.md)
 
+## RAG output
+
+I've started a new branch (will push and document late this evening) that gives output in a form that RAG serverse like (apparently):
+
+```
+{
+  "aliases": [],
+  "name": "Main",
+  "ports": [],
+  "type": "Module",
+  "unions": [
+    {
+      "constructors": [
+        {
+          "name": {
+            "region": {
+              "start": {
+                "line": 13,
+                "column": 14
+              },
+              "end": {
+                "line": 13,
+                "column": 19
+              }
+            },
+            "value": "Human"
+          },
+          "types": [
+            {
+              "region": {
+                "start": {
+                  "line": 13,
+                  "column": 20
+                },
+                "end": {
+                  "line": 13,
+                  "column": 26
+                }
+              },
+              "type": {
+                "name": "String",
+                "type": "Type",
+                "types": []
+              }
+            }
+          ]
+        },
+        {
+          "name": {
+            "region": {
+              "start": {
+                "line": 13,
+                "column": 29
+              },
+              "end": {
+                "line": 13,
+                "column": 31
+              }
+            },
+            "value": "AI"
+          },
+          "types": [
+            {
+              "region": {
+                "start": {
+                  "line": 13,
+                  "column": 32
+                },
+                "end": {
+                  "line": 13,
+                  "column": 38
+                }
+              },
+              "type": {
+                "name": "String",
+                "type": "Type",
+                "types": []
+              }
+            }
+          ]
+        },
+        {
+          "name": {
+            "region": {
+              "start": {
+                "line": 13,
+                "column": 41
+              },
+              "end": {
+                "line": 13,
+                "column": 46
+              }
+            },
+            "value": "Alien"
+          },
+          "types": []
+        }
+      ],
+      "name": {
+        "region": {
+          "start": {
+            "line": 13,
+            "column": 6
+          },
+          "end": {
+            "line": 13,
+            "column": 11
+          }
+        },
+        "value": "Agent"
+      },
+      "type": "Type",
+      "vars": []
+    }
+```
+
 ## TODO
 
 - Add much more detail to the output of --raw-ast. At the moment much of the output is given by placeholders.
