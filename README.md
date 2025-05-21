@@ -95,7 +95,7 @@ declarations work in Elm.
 At the moment (May 20, this repo is little more than a skeleton of what we are aiming for. See TODO list below).  
 
 
-See NOTES.md for additional details.
+See NOTES.md for additional details.m See also [RAG REPO](https://github.com/jxxcarlson/github_repo_rag/blob/ragChunker/README.md)
 
 ## TODO
 
