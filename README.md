@@ -39,6 +39,7 @@ Module: Main
 
 This output was for the input
 
+```
 module Main exposing (main, inc, Maybe(..), Result(..))
 
 import Html exposing (text)
