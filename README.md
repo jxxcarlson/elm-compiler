@@ -10,7 +10,7 @@ To play with it,
     where you use the correct path to the compiler
   - Let's call the alias `test-ast`.  Then cd to the the root of the repo and run `test-ast` to see the output of the AST.
 
-Here is an example of what we can do at present:
+## Here is an example of what we can do at present:
 
 ```
 ➜  elm-compiler git:(master) ✗ test-ast-raw
@@ -39,6 +39,29 @@ main : Html.Html msg
 main =
     text "Hello, World!" 
 ```
+
+### Note that errors are handled in the usual way:
+
+```
+➜  elm-compiler git:(master) test-ast-raw
+Detected problems in 1 module.
+-- NAMING ERROR --------------------------------------------------- src/Main.elm
+
+I cannot find a `Str` type:
+
+5| type Agent = Human Str | AI String | Alien
+                      ^^^
+These names seem close though:
+
+    Sub
+    Char
+    Cmd
+    Int
+
+Hint: Read <https://elm-lang.org/0.19.1/imports> to see how `import`
+declarations work in Elm.
+```
+
 
 At the moment (May 20, this repo is little more than a skeleton of what we are aiming for. See TODO list below).  
 

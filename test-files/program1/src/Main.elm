@@ -2,6 +2,10 @@ module Main exposing (main)
 
 import Html exposing (text)
 
+type Agent = Human String | AI String | Alien
+
+agent = AI "Claude"
+
 inc : Int -> Int
 inc x =
   let
