@@ -8,7 +8,7 @@ To play with it,
   - Find the path to the binary and make an alias ls something like this,
     `cd test-files/program1 && ../../dist-newstyle/build/aarch64-osx/ghc-9.6.7/elm-0.19.1/x/elm/build/elm/elm make --raw-ast src/Main.elm && cd -`
     where you use the correct path to the compiler
-  - Let's call the alias `test-ast-raw`.  Then cd to the the root of the repo and run `test-ast` to see the output of the AST.
+  - Let's call the alias `test-ast-raw`.  Then cd to the the root of the repo and run `test-ast-raw` to see the output of the AST.
 
 ## Here is an example of what we can do at present:
 
