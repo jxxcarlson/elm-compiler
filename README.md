@@ -10,7 +10,6 @@ To play with it,
     where you use the correct path to the compiler
   - Let's call the alias `test-ast`.  Then cd to the the root of the repo and run `test-ast` to see the output of the AST.
 
-<<<<<<< HEAD
 Here is an example of what we can do at present:
 
 ```
@@ -42,9 +41,7 @@ main =
 ```
 
 At the moment (May 20, this repo is little more than a skeleton of what we are aiming for. See TODO list below).  
-=======
-At the moment (May 21), this repo is little more than a skeleton of what we are aiming for. See TODO list below)
->>>>>>> 02ea41289c5ac73607e000d6bf7cf7afd7ef011b
+
 
 See NOTES.md for additional details.
 
