@@ -48,7 +48,8 @@ data Flags =
     , _output :: Maybe Output
     , _report :: Maybe ReportType
     , _docs :: Maybe FilePath
-    , _rawAst :: Bool --added by JC 
+    , _rawAst :: Bool
+    , _ragJson :: Bool
     }
   deriving (Show)
 
@@ -73,7 +74,7 @@ type Task a = Task.Task Exit.Make a
 
 
 run :: [FilePath] -> Flags -> IO ()
-run paths flags@(Flags debug optimize output report docs rawAst) =
+run paths flags@(Flags debug optimize output report docs rawAst ragJson) =
   do  style <- getStyle report
       maybeRoot <- Stuff.findRoot
       Reporting.attemptWithStyle style Exit.makeToReport $
@@ -83,12 +84,12 @@ run paths flags@(Flags debug optimize output report docs rawAst) =
 
 
 runHelp :: FilePath -> [FilePath] -> Reporting.Style -> Flags -> IO (Either Exit.Make ())
-runHelp root paths style (Flags debug optimize maybeOutput _ maybeDocs rawAst) =
+runHelp root paths style (Flags debug optimize maybeOutput _ maybeDocs rawAst ragJson) =
   BW.withScope $ \scope ->
   Stuff.withRootLock root $ Task.run $
   do  desiredMode <- getMode debug optimize
       details <- Task.eio Exit.MakeBadDetails (Details.load style scope root)
-      if rawAst
+      if rawAst || ragJson
         then do
           artifacts <- buildPaths style root details (NE.List (head paths) (tail paths))
           let moduleName = Name.fromChars $ FP.dropExtension $ FP.takeFileName (head paths)
@@ -98,7 +99,10 @@ runHelp root paths style (Flags debug optimize maybeOutput _ maybeDocs rawAst) =
               source <- Task.io $ BS.readFile (head paths)
               case Parse.fromByteString Parse.Application source of
                 Right srcModule -> do
-                  prettyOutput <- Task.io $ AST.Pretty.Raw.pretty AST.Pretty.Raw.defaultConfig srcModule
+                  let config = if ragJson 
+                              then AST.Pretty.Raw.defaultConfig { AST.Pretty.Raw.format = AST.Pretty.Raw.RagJson }
+                              else AST.Pretty.Raw.defaultConfig
+                  prettyOutput <- Task.io $ AST.Pretty.Raw.pretty config srcModule
                   Task.io $ putStrLn prettyOutput
                 Left err -> Task.throw $ Exit.MakeCannotBuild (Exit.BuildBadModules (head paths) (Error.Module (Name.fromChars $ FP.dropExtension $ FP.takeFileName (head paths)) (head paths) (File.zeroTime) (BS.empty) (Error.BadSyntax err)) [])
             Nothing -> Task.throw Exit.MakeNoMain

@@ -196,6 +196,7 @@ make =
         |-- flag "report" Make.reportType "You can say --report=json to get error messages as JSON. This is only really useful if you are an editor plugin. Humans should avoid it!"
         |-- flag "docs" Make.docsFile "Generate a JSON file of documentation for a package. Eventually it will be possible to preview docs with `reactor` because it is quite hard to deal with these JSON files directly."
         |-- onOff "raw-ast" "Print the raw AST of the Elm file."
+        |-- onOff "rag-json" "Print the raw AST of the Elm file in a JSON format suitable for RAG applications."
 
     runWithDebug paths flags = Make.run paths flags
   in
