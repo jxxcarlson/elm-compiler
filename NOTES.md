@@ -21,7 +21,7 @@ Or better, alias this to `test-ast` and run it from the root of the project (aft
 
 # Filling in the Gaps in AST.Pretty.Raw
 
-**Example**
+*Example*
 
 program1 is now
 
