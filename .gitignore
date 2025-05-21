@@ -6,3 +6,18 @@ cabal.sandbox.config
 .DS_Store
 *~
 travis.log
+
+# Build artifacts
+dist-newstyle/
+.ghc.environment.*
+cabal.project.local
+cabal.project.local~
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*~
+
+# OS files
+Thumbs.db
