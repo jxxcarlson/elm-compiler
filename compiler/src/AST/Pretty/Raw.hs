@@ -160,8 +160,26 @@ prettyUnions config unions =
 
 
 prettyUnion :: Config -> Src.Union -> String
-prettyUnion config (Src.Union name vars _) =
-    "[Type] " ++ ES.toChars (Name.toElmString (A.toValue name))
+prettyUnion config (Src.Union name vars ctors) =
+    let loc = prettyLocation (A.toRegion name)
+        nameStr = ES.toChars (Name.toElmString (A.toValue name))
+        varsStr = if null vars then "" else " " ++ unwords (map (ES.toChars . Name.toElmString . A.toValue) vars)
+        ctorsStr = unlines $ map (\(ctorName, types) -> 
+            "  " ++ prettyLocation (A.toRegion ctorName) ++ " " ++ 
+            ES.toChars (Name.toElmString (A.toValue ctorName)) ++
+            if null types then "" else " " ++ unwords (map prettyType types)) ctors
+    in "[Type] " ++ loc ++ " " ++ nameStr ++ varsStr ++ "\n" ++ ctorsStr
+
+
+prettyType :: Src.Type -> String
+prettyType (A.At _ type_) = case type_ of
+    Src.TLambda t1 t2 -> prettyType t1 ++ " -> " ++ prettyType t2
+    Src.TVar name -> ES.toChars (Name.toElmString name)
+    Src.TType _ name types -> ES.toChars (Name.toElmString name) ++ if null types then "" else " " ++ unwords (map prettyType types)
+    Src.TTypeQual _ name qual types -> ES.toChars (Name.toElmString name) ++ "." ++ ES.toChars (Name.toElmString qual) ++ if null types then "" else " " ++ unwords (map prettyType types)
+    Src.TRecord fields _ -> "{ " ++ unwords (map (\(n, t) -> ES.toChars (Name.toElmString (A.toValue n)) ++ " : " ++ prettyType t) fields) ++ " }"
+    Src.TUnit -> "()"
+    Src.TTuple t1 t2 ts -> "(" ++ prettyType t1 ++ ", " ++ prettyType t2 ++ concatMap ((", " ++) . prettyType) ts ++ ")"
 
 
 prettyAliases :: Config -> [Src.Alias] -> String

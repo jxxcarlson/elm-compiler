@@ -16,23 +16,51 @@ To play with it,
 ➜  elm-compiler git:(master) ✗ test-ast-raw
 Success!
 Module: Main
-[Function] main with patterns:  = [14:5-14:25] [14:5-14:9] text [14:10-14:25] "Hello, World!"
+[Function] main with patterns:  = [27:5-27:25] [27:5-27:9] text [27:10-27:25] "Hello, World!"
 
-[Function] inc with patterns: [6:5-6:6] x = [7:3-10:14] let [8:5-8:14] delta  = [8:13-8:14] 2 in [10:5-10:14] [10:5-10:6] x + [10:9-10:14] delta
+[Function] inc with patterns: [18:5-18:6] x = [19:5-23:14] let [20:9-21:14] delta  = [21:13-21:14] 2 in [23:5-23:14] [23:5-23:6] x + [23:9-23:14] delta
+
+[Function] agent with patterns:  = [15:9-15:20] [15:9-15:11] AI [15:12-15:20] "Claude"
+
+[Type] [13:6-13:11] Agent
+  [13:14-13:19] Human String
+  [13:29-13:31] AI String
+  [13:41-13:46] Alien
+
+[Type] [9:6-9:12] Result error value
+  [10:7-10:9] Ok value
+  [11:7-11:10] Err error
+
+[Type] [5:6-5:11] Maybe a
+  [6:7-6:11] Just a
+  [7:7-7:14] Nothing
+
 ```
 
 This output was for the input
 
-```
-module Main exposing (main)
+module Main exposing (main, inc, Maybe(..), Result(..))
 
 import Html exposing (text)
 
+type Maybe a
+    = Just a
+    | Nothing
+
+type Result error value
+    = Ok value
+    | Err error
+
+type Agent = Human String | AI String | Alien
+
+agent = AI "Claude"
+
 inc : Int -> Int
 inc x =
-  let
-    delta = 2
-  in
+    let
+        delta =
+            2
+    in
     x + delta
 
 main : Html.Html msg
