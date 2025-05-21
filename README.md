@@ -10,7 +10,37 @@ To play with it,
     where you use the correct path to the compiler
   - Let's call the alias `test-ast`.  Then cd to the the root of the repo and run `test-ast` to see the output of the AST.
 
-At the moment (May 20, this repo is little more than a skeleton of what we are aiming for. See TODO list below)
+Here is an example of what we can do at present:
+
+```
+➜  elm-compiler git:(master) ✗ test-ast-raw
+Success!
+Module: Main
+[Function] main with patterns:  = [14:5-14:25] [14:5-14:9] text [14:10-14:25] "Hello, World!"
+
+[Function] inc with patterns: [6:5-6:6] x = [7:3-10:14] let [8:5-8:14] delta  = [8:13-8:14] 2 in [10:5-10:14] [10:5-10:6] x + [10:9-10:14] delta
+```
+
+This output was for the input
+
+```
+module Main exposing (main)
+
+import Html exposing (text)
+
+inc : Int -> Int
+inc x =
+  let
+    delta = 2
+  in
+    x + delta
+
+main : Html.Html msg
+main =
+    text "Hello, World!" 
+```
+
+At the moment (May 20, this repo is little more than a skeleton of what we are aiming for. See TODO list below).  
 
 See NOTES.md for additional details.
 

@@ -85,8 +85,9 @@ prettyValues config values =
 
 
 prettyPattern :: Src.Pattern -> String
-prettyPattern (A.At _ pattern_) =
-    case pattern_ of
+prettyPattern (A.At region pattern_) =
+    let loc = prettyLocation region
+    in loc ++ " " ++ case pattern_ of
         Src.PAnything -> "_"
         Src.PVar name -> ES.toChars (Name.toElmString name)
         Src.PRecord fields -> "{" ++ unwords (map (ES.toChars . Name.toElmString . A.toValue) fields) ++ "}"
@@ -103,8 +104,9 @@ prettyPattern (A.At _ pattern_) =
 
 
 prettyExpr :: Src.Expr -> String
-prettyExpr (A.At _ expr_) =
-    case expr_ of
+prettyExpr (A.At region expr_) =
+    let loc = prettyLocation region
+    in loc ++ " " ++ case expr_ of
         Src.Chr str -> show (ES.toChars str)
         Src.Str str -> show (ES.toChars str)
         Src.Int i -> show i
@@ -122,11 +124,13 @@ prettyExpr (A.At _ expr_) =
             "let " ++ intercalate "; " defStrings ++ " in " ++ prettyExpr expr
             where
                 defStrings = map prettyDef defs
-                prettyDef (A.At _ def) = case def of
-                    Src.Define name patterns e _ ->
-                        ES.toChars (Name.toElmString (A.toValue name)) ++ " " ++ unwords (map prettyPattern patterns) ++ " = " ++ prettyExpr e
-                    Src.Destruct pat e ->
-                        prettyPattern pat ++ " = " ++ prettyExpr e
+                prettyDef (A.At region def) = 
+                    let loc = prettyLocation region
+                    in loc ++ " " ++ case def of
+                        Src.Define name patterns e _ ->
+                            ES.toChars (Name.toElmString (A.toValue name)) ++ " " ++ unwords (map prettyPattern patterns) ++ " = " ++ prettyExpr e
+                        Src.Destruct pat e ->
+                            prettyPattern pat ++ " = " ++ prettyExpr e
         Src.Case expr branches -> "case " ++ prettyExpr expr ++ " of ..."
         Src.Accessor name -> "." ++ ES.toChars (Name.toElmString name)
         Src.Access expr name -> prettyExpr expr ++ "." ++ ES.toChars (Name.toElmString (A.toValue name))
@@ -135,6 +139,12 @@ prettyExpr (A.At _ expr_) =
         Src.Unit -> "()"
         Src.Tuple e1 e2 es -> "(" ++ prettyExpr e1 ++ ", " ++ prettyExpr e2 ++ concatMap ((", " ++) . prettyExpr) es ++ ")"
         Src.Shader _ _ -> "<shader>"
+
+
+prettyLocation :: A.Region -> String
+prettyLocation (A.Region (A.Position startLine startCol) (A.Position endLine endCol)) =
+    "[" ++ show startLine ++ ":" ++ show startCol ++ 
+    "-" ++ show endLine ++ ":" ++ show endCol ++ "]"
 
 
 prettyValue :: Config -> Src.Value -> String
