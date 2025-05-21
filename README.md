@@ -99,7 +99,8 @@ See NOTES.md for additional details.m See also [RAG REPO](https://github.com/jxx
 
 ## RAG output
 
-I've started a new branch (will push and document late this evening) that gives output in a form that RAG serverse like (apparently):
+I've started a new branch (will push and document late this evening) that gives output in a form that RAG serverse like (apparently).
+This is a first try:
 
 ```
 {
