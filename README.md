@@ -99,8 +99,8 @@ See NOTES.md for additional details.m See also [RAG REPO](https://github.com/jxx
 
 ## RAG output
 
-I've started a new branch (will push and document late this evening) that gives output in a form that RAG serverse like (apparently).
-This is a first try:
+I've started a new branch (rag-json) that gives output in a form that RAG serverse like (apparently)
+Below is a first try.  To duplicate, adapt this: `cabal build && cd test-files/program1 && /Users/carlson/dev/elm/hacking-ast-json/elm-compiler/dist-newstyle/build/aarch64-osx/ghc-9.6.7/elm-0.19.1/x/elm/build/elm/elm make --rag-json src/Main.elm`
 
 ```
 {
