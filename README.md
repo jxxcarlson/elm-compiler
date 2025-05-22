@@ -14,14 +14,14 @@ To play with it,
      ```
      ...
      
-     --raw-ast
+     --ast-raw
         Print the raw AST of the Elm file.
 
-    --rag-json
+    --ast-json
         Print the raw AST of the Elm file in a JSON format suitable for RAG
         applications.
 
-    --rag-json-pretty
+    --ast-json-pretty
         Print the raw AST of the Elm file in a pretty-printed JSON format.
      ```
 
