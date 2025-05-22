@@ -14,21 +14,21 @@ To play with it,
      ```
      ...
      
-     --raw-ast
+     --ast-raw
         Print the raw AST of the Elm file.
 
-    --rag-json
+    --ast-json
         Print the raw AST of the Elm file in a JSON format suitable for RAG
         applications.
 
-    --rag-json-pretty
-        Print the raw AST of the Elm file in a pretty-printed JSON format.
+    --ast-json-pretty
+        Print the raw AST of the Elm file in a pretty-printed JSON format suitable for RAG applications.
      ```
 
-  Try these options.  For example, in `test-files/project1`, do `elmx make --rag-json-pretty src/Main.elm`   
+  Try these options.  For example, in `test-files/project1`, do `elmx make --ast-json-pretty src/Main.elm`   
 
-**NOTE.** _The `rag-json` and `rag-json-pretty` options are intended to produce output for RAG servers.
-However, at the moment, they are just JSON versions of what you get with --raw-ast._
+**NOTE.** _The `ast-json` and `ast-json-pretty` options are intended to produce output for RAG servers.
+However, at the moment, they are just JSON versions of what you get with --ast-raw._
 
 **Further Note.** _Here is what ChatGPT tells me is a typical RAG chunk:_
 ```

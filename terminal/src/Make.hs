@@ -7,7 +7,7 @@ module Make
   , reportType
   , output
   , docsFile
-  , ragJsonPretty
+  , astJsonPretty
   , flags
   )
   where
@@ -50,9 +50,9 @@ data Flags =
     , _output :: Maybe Output
     , _report :: Maybe ReportType
     , _docs :: Maybe FilePath
-    , _rawAst :: Bool
-    , _ragJson :: Bool
-    , _ragJsonPretty :: Bool
+    , _astRaw :: Bool
+    , _astJson :: Bool
+    , _astJsonPretty :: Bool
     }
   deriving (Show)
 
@@ -77,7 +77,7 @@ type Task a = Task.Task Exit.Make a
 
 
 run :: [FilePath] -> Flags -> IO ()
-run paths flags@(Flags debug optimize output report docs rawAst ragJson ragJsonPretty) =
+run paths flags@(Flags debug optimize output report docs astRaw astJson astJsonPretty) =
   do  style <- getStyle report
       maybeRoot <- Stuff.findRoot
       Reporting.attemptWithStyle style Exit.makeToReport $
@@ -87,12 +87,12 @@ run paths flags@(Flags debug optimize output report docs rawAst ragJson ragJsonP
 
 
 runHelp :: FilePath -> [FilePath] -> Reporting.Style -> Flags -> IO (Either Exit.Make ())
-runHelp root paths style (Flags debug optimize maybeOutput _ maybeDocs rawAst ragJson ragJsonPretty) =
+runHelp root paths style (Flags debug optimize maybeOutput _ maybeDocs astRaw astJson astJsonPretty) =
   BW.withScope $ \scope ->
   Stuff.withRootLock root $ Task.run $
   do  desiredMode <- getMode debug optimize
       details <- Task.eio Exit.MakeBadDetails (Details.load style scope root)
-      if rawAst || ragJson || ragJsonPretty
+      if astRaw || astJson || astJsonPretty
         then do
           artifacts <- buildPaths style root details (NE.List (head paths) (tail paths))
           let moduleName = Name.fromChars $ FP.dropExtension $ FP.takeFileName (head paths)
@@ -103,8 +103,8 @@ runHelp root paths style (Flags debug optimize maybeOutput _ maybeDocs rawAst ra
               case Parse.fromByteString Parse.Application source of
                 Right srcModule -> do
                   let config
-                        | ragJsonPretty = AST.Pretty.Raw.defaultConfig { AST.Pretty.Raw.format = AST.Pretty.Raw.RagJsonPretty }
-                        | ragJson = AST.Pretty.Raw.defaultConfig { AST.Pretty.Raw.format = AST.Pretty.Raw.RagJson }
+                        | astJsonPretty = AST.Pretty.Raw.defaultConfig { AST.Pretty.Raw.format = AST.Pretty.Raw.RagJsonPretty }
+                        | astJson = AST.Pretty.Raw.defaultConfig { AST.Pretty.Raw.format = AST.Pretty.Raw.RagJson }
                         | otherwise = AST.Pretty.Raw.defaultConfig
                   prettyOutput <- Task.io $ AST.Pretty.Raw.pretty config srcModule
                   Task.io $ putStrLn prettyOutput
@@ -349,14 +349,14 @@ isDevNull name =
   name == "/dev/null" || name == "NUL" || name == "$null"
 
 
-ragJsonPretty :: Parser Bool
-ragJsonPretty =
+astJsonPretty :: Parser Bool
+astJsonPretty =
   Parser
-    { _singular = "rag-json-pretty"
-    , _plural = "rag-json-pretty"
-    , _parser = \string -> if string == "rag-json-pretty" then Just True else Nothing
+    { _singular = "ast-json-pretty"
+    , _plural = "ast-json-pretty"
+    , _parser = \string -> if string == "ast-json-pretty" then Just True else Nothing
     , _suggest = \_ -> return []
-    , _examples = \_ -> return ["rag-json-pretty"]
+    , _examples = \_ -> return ["ast-json-pretty"]
     }
 
 
@@ -368,7 +368,7 @@ flags =
     , _output = Nothing
     , _report = Nothing
     , _docs = Nothing
-    , _rawAst = False
-    , _ragJson = False
-    , _ragJsonPretty = False
+    , _astRaw = False
+    , _astJson = False
+    , _astJsonPretty = False
     }
