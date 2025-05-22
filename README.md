@@ -21,7 +21,7 @@ To play with it,
         Print the raw AST of the Elm file in a JSON format.
 
     --ast-json-pretty
-        As with --ast-json, but easier for humans to read
+        As above, but easier for humans to read.
 
     --rag
         Print the AST in a RAG-friendly format with type, name, code, language,
@@ -32,7 +32,7 @@ To play with it,
         language, file path, line numbers, calls, imports, and docstring.
 
     --rag-json-pretty
-        As with --rag-json, but easier for humans to read
+        As above, but easier for humans to read.
      ```
 
   Try these options.  For example, in `test-files/project1`, do `elmx make --rag-json-pretty src/Main.elm`   
