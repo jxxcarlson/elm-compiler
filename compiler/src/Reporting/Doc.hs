@@ -271,7 +271,7 @@ isWindows =
 
 encode :: P.Doc -> E.Value
 encode doc =
-  E.array (toJsonHelp noStyle [] (P.renderPretty 1 80 doc))
+  E.array (toJsonHelp noStyle [] (P.displayS (P.renderPretty 1 80 doc) ""))
 
 
 data Style =
@@ -306,28 +306,22 @@ data Color
   | WHITE
 
 
-toJsonHelp :: Style -> [String] -> P.SimpleDoc -> [E.Value]
-toJsonHelp style revChunks simpleDoc =
-  case simpleDoc of
-    P.SFail ->
-      error $
-        "according to the main implementation, @SFail@ can not\
-        \ appear uncaught in a rendered @SimpleDoc@"
-
-    P.SEmpty ->
-      [ encodeChunks style revChunks ]
-
-    P.SChar char rest ->
-      toJsonHelp style ([char] : revChunks) rest
-
-    P.SText _ string rest ->
-      toJsonHelp style (string : revChunks) rest
-
-    P.SLine indent rest ->
-      toJsonHelp style (replicate indent ' ' : "\n" : revChunks) rest
-
-    P.SSGR sgrs rest ->
-      encodeChunks style revChunks : toJsonHelp (sgrToStyle sgrs style) [] rest
+toJsonHelp :: Style -> [String] -> String -> [E.Value]
+toJsonHelp style revChunks rendered =
+  let
+    chunks = reverse revChunks
+    chars = concat chunks
+  in
+  case style of
+    Style False False Nothing ->
+      [E.chars chars]
+    _ ->
+      [E.object
+        [ "bold" ==> E.bool (_bold style)
+        , "underline" ==> E.bool (_underline style)
+        , "color" ==> maybe E.null encodeColor (_color style)
+        , "string" ==> E.chars chars
+        ]]
 
 
 sgrToStyle :: [Ansi.SGR] -> Style -> Style
@@ -389,24 +383,6 @@ toColor layer intensity color =
           Ansi.Blue    -> pick Blue    BLUE
           Ansi.White   -> pick White   WHITE
           Ansi.Black   -> pick Black   BLACK
-
-
-encodeChunks :: Style -> [String] -> E.Value
-encodeChunks (Style bold underline color) revChunks =
-  let
-    chars = concat (reverse revChunks)
-  in
-  case color of
-    Nothing | not bold && not underline ->
-      E.chars chars
-
-    _ ->
-      E.object
-        [ "bold" ==> E.bool bold
-        , "underline" ==> E.bool underline
-        , "color" ==> maybe E.null encodeColor color
-        , "string" ==> E.chars chars
-        ]
 
 
 encodeColor :: Color -> E.Value

@@ -11,6 +11,7 @@ module AST.Pretty.Raw
 
 import qualified AST.Source as Src
 import qualified Data.Aeson as Aeson
+import qualified Data.Aeson.Encode.Pretty as AesonPretty
 import qualified Data.Text as T
 import qualified Data.Text.Lazy as TL
 import qualified Data.Text.Lazy.Builder as TB
@@ -41,6 +42,8 @@ data Config =
 data OutputFormat
     = Text
     | Json
+    | RagJson
+    | RagJsonPretty
 
 
 defaultConfig :: Config
@@ -61,6 +64,10 @@ pretty config modul = do
             prettyText config modul
         Json ->
             return $ prettyJson config modul
+        RagJson ->
+            return $ prettyRagJson config modul
+        RagJsonPretty ->
+            return $ prettyRagJsonPretty config modul
 
 
 prettyText :: Config -> Src.Module -> IO String
@@ -255,4 +262,26 @@ encodePort (Src.Port name _) =
     Aeson.object
         [ "type" Aeson..= ("Port" :: String)
         , "name" Aeson..= ES.toChars (Name.toElmString (A.toValue name))
-        ] 
+        ]
+
+
+prettyRagJson :: Config -> Src.Module -> String
+prettyRagJson config modul =
+    BL.unpack $ Aeson.encode $ encodeRagModule modul
+
+
+encodeRagModule :: Src.Module -> Aeson.Value
+encodeRagModule modul =
+    Aeson.object
+        [ "type" Aeson..= ("Module" :: String)
+        , "name" Aeson..= ES.toChars (Name.toElmString (Src.getName modul))
+        , "values" Aeson..= map (encodeValue . A.toValue) (Src._values modul)
+        , "unions" Aeson..= map (encodeUnion . A.toValue) (Src._unions modul)
+        , "aliases" Aeson..= map (encodeAlias . A.toValue) (Src._aliases modul)
+        , "ports" Aeson..= map encodePort (getPorts modul)
+        ]
+
+
+prettyRagJsonPretty :: Config -> Src.Module -> String
+prettyRagJsonPretty config modul =
+    BL.unpack $ AesonPretty.encodePretty $ encodeRagModule modul 

@@ -7,6 +7,8 @@ module Make
   , reportType
   , output
   , docsFile
+  , ragJsonPretty
+  , flags
   )
   where
 
@@ -48,7 +50,9 @@ data Flags =
     , _output :: Maybe Output
     , _report :: Maybe ReportType
     , _docs :: Maybe FilePath
-    , _rawAst :: Bool --added by JC 
+    , _rawAst :: Bool
+    , _ragJson :: Bool
+    , _ragJsonPretty :: Bool
     }
   deriving (Show)
 
@@ -73,7 +77,7 @@ type Task a = Task.Task Exit.Make a
 
 
 run :: [FilePath] -> Flags -> IO ()
-run paths flags@(Flags debug optimize output report docs rawAst) =
+run paths flags@(Flags debug optimize output report docs rawAst ragJson ragJsonPretty) =
   do  style <- getStyle report
       maybeRoot <- Stuff.findRoot
       Reporting.attemptWithStyle style Exit.makeToReport $
@@ -83,12 +87,12 @@ run paths flags@(Flags debug optimize output report docs rawAst) =
 
 
 runHelp :: FilePath -> [FilePath] -> Reporting.Style -> Flags -> IO (Either Exit.Make ())
-runHelp root paths style (Flags debug optimize maybeOutput _ maybeDocs rawAst) =
+runHelp root paths style (Flags debug optimize maybeOutput _ maybeDocs rawAst ragJson ragJsonPretty) =
   BW.withScope $ \scope ->
   Stuff.withRootLock root $ Task.run $
   do  desiredMode <- getMode debug optimize
       details <- Task.eio Exit.MakeBadDetails (Details.load style scope root)
-      if rawAst
+      if rawAst || ragJson || ragJsonPretty
         then do
           artifacts <- buildPaths style root details (NE.List (head paths) (tail paths))
           let moduleName = Name.fromChars $ FP.dropExtension $ FP.takeFileName (head paths)
@@ -98,7 +102,11 @@ runHelp root paths style (Flags debug optimize maybeOutput _ maybeDocs rawAst) =
               source <- Task.io $ BS.readFile (head paths)
               case Parse.fromByteString Parse.Application source of
                 Right srcModule -> do
-                  prettyOutput <- Task.io $ AST.Pretty.Raw.pretty AST.Pretty.Raw.defaultConfig srcModule
+                  let config
+                        | ragJsonPretty = AST.Pretty.Raw.defaultConfig { AST.Pretty.Raw.format = AST.Pretty.Raw.RagJsonPretty }
+                        | ragJson = AST.Pretty.Raw.defaultConfig { AST.Pretty.Raw.format = AST.Pretty.Raw.RagJson }
+                        | otherwise = AST.Pretty.Raw.defaultConfig
+                  prettyOutput <- Task.io $ AST.Pretty.Raw.pretty config srcModule
                   Task.io $ putStrLn prettyOutput
                 Left err -> Task.throw $ Exit.MakeCannotBuild (Exit.BuildBadModules (head paths) (Error.Module (Name.fromChars $ FP.dropExtension $ FP.takeFileName (head paths)) (head paths) (File.zeroTime) (BS.empty) (Error.BadSyntax err)) [])
             Nothing -> Task.throw Exit.MakeNoMain
@@ -165,13 +173,11 @@ getMode debug optimize =
 getExposed :: Details.Details -> Task (NE.List ModuleName.Raw)
 getExposed (Details.Details _ validOutline _ _ _ _) =
   case validOutline of
-    Details.ValidApp _ ->
-      Task.throw Exit.MakeAppNeedsFileNames
-
-    Details.ValidPkg _ exposed _ ->
-      case exposed of
-        [] -> Task.throw Exit.MakePkgNeedsExposing
-        m:ms -> return (NE.List m ms)
+    Details.ValidApp _ -> Task.throw Exit.MakeAppNeedsFileNames
+    Details.ValidPkg _ exposed _
+      -> case exposed of
+           [] -> Task.throw Exit.MakePkgNeedsExposing
+           m : ms -> return (NE.List m ms)
 
 
 
@@ -341,3 +347,28 @@ hasExt ext path =
 isDevNull :: String -> Bool
 isDevNull name =
   name == "/dev/null" || name == "NUL" || name == "$null"
+
+
+ragJsonPretty :: Parser Bool
+ragJsonPretty =
+  Parser
+    { _singular = "rag-json-pretty"
+    , _plural = "rag-json-pretty"
+    , _parser = \string -> if string == "rag-json-pretty" then Just True else Nothing
+    , _suggest = \_ -> return []
+    , _examples = \_ -> return ["rag-json-pretty"]
+    }
+
+
+flags :: Flags
+flags =
+  Flags
+    { _debug = False
+    , _optimize = False
+    , _output = Nothing
+    , _report = Nothing
+    , _docs = Nothing
+    , _rawAst = False
+    , _ragJson = False
+    , _ragJsonPretty = False
+    }
