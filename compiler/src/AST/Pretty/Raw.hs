@@ -452,4 +452,13 @@ getLineNumbers :: A.Region -> (Int, Int)
 getLineNumbers (A.Region (A.Position start _) (A.Position end _)) = (fromIntegral start, fromIntegral end)
 
 prettyRaw :: Config -> Src.Module -> String
-prettyRaw _ _ = "-- raw AST pretty printing not implemented --"
+prettyRaw config modul =
+    let
+        header = "Module: " ++ ES.toChars (Name.toElmString (Src.getName modul)) ++ "\n\n"
+        imports = "Imports:\n" ++ unlines (map ("  " ++) (getImports modul)) ++ "\n"
+        values = "Values:\n" ++ prettyValues config (map A.toValue (Src._values modul))
+        unions = "Types:\n" ++ prettyUnions config (map A.toValue (Src._unions modul))
+        aliases = "Type Aliases:\n" ++ prettyAliases config (map A.toValue (Src._aliases modul))
+        ports = "Ports:\n" ++ prettyPorts config (getPorts modul)
+    in
+        header ++ imports ++ values ++ unions ++ aliases ++ ports
