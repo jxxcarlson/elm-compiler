@@ -14,24 +14,25 @@ To play with it,
      ```
      ...
      
-     --ast-raw
+    --ast
         Print the raw AST of the Elm file.
 
     --ast-json
-        Print the raw AST of the Elm file in a JSON format suitable for RAG
-        applications.
+        Print the raw AST of the Elm file in a JSON format.
 
     --ast-json-pretty
-        Print the raw AST of the Elm file in a pretty-printed JSON format suitable for RAG applications.
+        As with --ast-json, but easier for humans to read
 
     --rag
-        Print the AST in a RAG-friendly format with type, name, code, language, file path, line numbers, calls, imports, and docstring.
+        Print the AST in a RAG-friendly format with type, name, code, language,
+        file path, line numbers, calls, imports, and docstring.
 
     --rag-json
-        Print the AST in a RAG-friendly JSON format with type, name, code, language, file path, line numbers, calls, imports, and docstring.
+        Print the AST in a RAG-friendly JSON format with type, name, code,
+        language, file path, line numbers, calls, imports, and docstring.
 
     --rag-json-pretty
-        Print the AST in a pretty-printed RAG-friendly JSON format with type, name, code, language, file path, line numbers, calls, imports, and docstring.
+        As with --rag-json, but easier for humans to read
      ```
 
   Try these options.  For example, in `test-files/project1`, do `elmx make --rag-json-pretty src/Main.elm`   
