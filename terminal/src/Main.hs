@@ -198,6 +198,9 @@ make =
         |-- onOff "ast-raw" "Print the raw AST of the Elm file."
         |-- onOff "ast-json" "Print the raw AST of the Elm file in a JSON format suitable for RAG applications."
         |-- onOff "ast-json-pretty" "Print the raw AST of the Elm file in a pretty-printed JSON format suitable for RAG applications."
+        |-- onOff "rag" "Print the AST in a RAG-friendly format with type, name, code, language, file path, line numbers, calls, imports, and docstring."
+        |-- onOff "rag-json" "Print the AST in a RAG-friendly JSON format with type, name, code, language, file path, line numbers, calls, imports, and docstring."
+        |-- onOff "rag-json-pretty" "Print the AST in a pretty-printed RAG-friendly JSON format with type, name, code, language, file path, line numbers, calls, imports, and docstring."
   in
   Terminal.Command "make" Uncommon details example (zeroOrMore elmFile) makeFlags Make.run
 

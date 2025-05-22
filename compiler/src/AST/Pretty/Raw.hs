@@ -23,12 +23,16 @@ import qualified Reporting.Annotation as A
 import qualified Elm.String as ES
 import qualified Data.ByteString.Lazy.Char8 as BL
 import System.IO.Unsafe (unsafePerformIO)
-import System.IO (appendFile)
+import System.IO (appendFile, readFile)
 import System.Directory (getCurrentDirectory)
 import qualified Elm.Float as EF
 import qualified Data.ByteString.Builder as B
-import Data.List (intercalate)
+import Data.List (intercalate, findIndex, tails, isPrefixOf)
 import Data.Aeson.Encode.Pretty (encodePretty)
+import Data.Maybe (mapMaybe)
+import qualified Data.Vector as V
+import qualified Data.Aeson.Key as AesonKey
+import Text.Regex.TDFA ((=~))
 
 
 data Config =
@@ -41,8 +45,10 @@ data Config =
 
 
 data OutputFormat
-    = Text
-    | Json
+    = AstRaw
+    | AstJson
+    | AstJsonPretty
+    | Rag
     | RagJson
     | RagJsonPretty
 
@@ -50,25 +56,22 @@ data OutputFormat
 defaultConfig :: Config
 defaultConfig =
     Config
-        { format = Text
+        { format = AstRaw
         , showPlaceholders = True
         , indentSize = 2
         , maxLineLength = 80
         }
 
 
-pretty :: Config -> Src.Module -> IO String
-pretty config modul = do
-    cwd <- getCurrentDirectory
+pretty :: Config -> FilePath -> Src.Module -> String
+pretty config filePath modul =
     case format config of
-        Text ->
-            prettyText config modul
-        Json ->
-            return $ prettyJson config modul
-        RagJson ->
-            return $ prettyRagJson config modul
-        RagJsonPretty ->
-            return $ prettyRagJsonPretty config modul
+        AstRaw -> prettyRaw config modul
+        AstJson -> prettyJson config modul
+        AstJsonPretty -> prettyJsonPretty config modul
+        Rag -> prettyRag config filePath modul
+        RagJson -> prettyRagJson config filePath modul
+        RagJsonPretty -> prettyRagJsonPretty config filePath modul
 
 
 prettyText :: Config -> Src.Module -> IO String
@@ -222,6 +225,11 @@ prettyJson config modul =
     BL.unpack $ Aeson.encode $ encodeModule modul
 
 
+prettyJsonPretty :: Config -> Src.Module -> String
+prettyJsonPretty config modul =
+    BL.unpack $ AesonPretty.encodePretty $ encodeModule modul
+
+
 encodeModule :: Src.Module -> Aeson.Value
 encodeModule modul =
     Aeson.object
@@ -266,312 +274,182 @@ encodePort (Src.Port name _) =
         ]
 
 
-prettyRagJson :: Config -> Src.Module -> String
-prettyRagJson config modul =
-    BL.unpack $ Aeson.encode $ encodeRagModule modul
+prettyRagJson :: Config -> FilePath -> Src.Module -> String
+prettyRagJson config filePath modul =
+    BL.unpack $ Aeson.encode $ parseRagOutput (prettyRag config filePath modul)
 
 
-encodeRagModule :: Src.Module -> Aeson.Value
-encodeRagModule modul =
-    Aeson.object
-        [ "type" Aeson..= ("Module" :: String)
-        , "name" Aeson..= ES.toChars (Name.toElmString (Src.getName modul))
-        , "values" Aeson..= map encodeRagValue (Src._values modul)
-        , "unions" Aeson..= map (encodeRagUnion . A.toValue) (Src._unions modul)
-        , "aliases" Aeson..= map (encodeRagAlias . A.toValue) (Src._aliases modul)
-        , "ports" Aeson..= map encodeRagPort (getPorts modul)
+prettyRagJsonPretty :: Config -> FilePath -> Src.Module -> String
+prettyRagJsonPretty config filePath modul =
+    BL.unpack $ AesonPretty.encodePretty' (AesonPretty.defConfig { AesonPretty.confIndent = AesonPretty.Spaces 2 }) $ parseRagOutput (prettyRag config filePath modul)
+
+
+parseRagOutput :: String -> Aeson.Value
+parseRagOutput str =
+    let chunks = splitOn "\n\n" str
+        parseChunk chunk =
+            let lines = splitOn "\n" chunk
+                parseLine line =
+                    case splitOn ": " line of
+                        [key, value] -> AesonKey.fromText (T.pack key) Aeson..= Aeson.String (T.pack value)
+                        _ -> AesonKey.fromText (T.pack "") Aeson..= Aeson.Null
+                pairs = map parseLine lines
+            in Aeson.object pairs
+    in Aeson.Array $ V.fromList $ map parseChunk chunks
+
+
+splitOn :: String -> String -> [String]
+splitOn delim str = 
+    case breakOn delim str of
+        (a, b) -> a : if null b then [] else splitOn delim (drop (length delim) b)
+
+
+breakOn :: String -> String -> (String, String)
+breakOn delim str = 
+    case findIndex (isPrefixOf delim) (tails str) of
+        Just i -> splitAt i str
+        Nothing -> (str, "")
+
+
+prettyRag :: Config -> FilePath -> Src.Module -> String
+prettyRag config filePath modul =
+    let values = map (prettyRagValue filePath modul) (Src._values modul)
+        unions = map (prettyRagUnion filePath modul) (Src._unions modul)
+        aliases = map (prettyRagAlias filePath modul) (Src._aliases modul)
+        ports = map (prettyRagPort filePath modul) (getPorts modul)
+    in unlines (values ++ unions ++ aliases ++ ports)
+
+prettyRagValue :: FilePath -> Src.Module -> A.Located Src.Value -> String
+prettyRagValue filePath modul (A.At region (Src.Value name patterns expr _)) =
+    let lineNumbers = getLineNumbers region
+        docstring = getDocstringFromRegion filePath region
+        calls = getCalls expr
+        imports = getImports modul
+    in unlines
+        [ "Type: Function"
+        , "Name: " ++ ES.toChars (Name.toElmString (A.toValue name))
+        , "Code: " ++ ES.toChars (Name.toElmString (A.toValue name))
+        , "Language: elm"
+        , "File: " ++ filePath
+        , "StartLine: " ++ show (fst lineNumbers)
+        , "EndLine: " ++ show (snd lineNumbers)
+        , "Calls: " ++ show calls
+        , "Imports: " ++ show imports
+        , "Docstring: " ++ docstring
         ]
 
-
-encodeRagValue :: A.Located Src.Value -> Aeson.Value
-encodeRagValue (A.At region (Src.Value name patterns expr _)) =
-    Aeson.object
-        [ "type" Aeson..= ("Function" :: String)
-        , "region" Aeson..= encodeRegion region
-        , "name" Aeson..= ES.toChars (Name.toElmString (A.toValue name))
-        , "patterns" Aeson..= map encodeRagPattern patterns
-        , "expression" Aeson..= encodeRagExpr expr
+prettyRagUnion :: FilePath -> Src.Module -> A.Located Src.Union -> String
+prettyRagUnion filePath modul (A.At region (Src.Union name vars _)) =
+    let lineNumbers = getLineNumbers region
+        docstring = getDocstringFromRegion filePath region
+        imports = getImports modul
+    in unlines
+        [ "Type: Type"
+        , "Name: " ++ ES.toChars (Name.toElmString (A.toValue name))
+        , "Code: " ++ ES.toChars (Name.toElmString (A.toValue name))
+        , "Language: elm"
+        , "File: " ++ filePath
+        , "StartLine: " ++ show (fst lineNumbers)
+        , "EndLine: " ++ show (snd lineNumbers)
+        , "Calls: []"
+        , "Imports: " ++ show imports
+        , "Docstring: " ++ docstring
         ]
 
-
-encodeRagPattern :: Src.Pattern -> Aeson.Value
-encodeRagPattern (A.At region pattern_) =
-    Aeson.object
-        [ "type" Aeson..= ("Pattern" :: String)
-        , "region" Aeson..= encodeRegion region
-        , "pattern" Aeson..= case pattern_ of
-            Src.PAnything -> Aeson.String "anything"
-            Src.PVar name -> Aeson.object
-                [ "type" Aeson..= ("Var" :: String)
-                , "name" Aeson..= ES.toChars (Name.toElmString name)
-                ]
-            Src.PRecord fields -> Aeson.object
-                [ "type" Aeson..= ("Record" :: String)
-                , "fields" Aeson..= map (ES.toChars . Name.toElmString . A.toValue) fields
-                ]
-            Src.PAlias pat name -> Aeson.object
-                [ "type" Aeson..= ("Alias" :: String)
-                , "pattern" Aeson..= encodeRagPattern pat
-                , "name" Aeson..= ES.toChars (Name.toElmString (A.toValue name))
-                ]
-            Src.PUnit -> Aeson.String "unit"
-            Src.PTuple p1 p2 ps -> Aeson.object
-                [ "type" Aeson..= ("Tuple" :: String)
-                , "patterns" Aeson..= map encodeRagPattern (p1:p2:ps)
-                ]
-            Src.PCtor _ name patterns -> Aeson.object
-                [ "type" Aeson..= ("Constructor" :: String)
-                , "name" Aeson..= ES.toChars (Name.toElmString name)
-                , "patterns" Aeson..= map encodeRagPattern patterns
-                ]
-            Src.PCtorQual _ name qual patterns -> Aeson.object
-                [ "type" Aeson..= ("QualifiedConstructor" :: String)
-                , "name" Aeson..= ES.toChars (Name.toElmString name)
-                , "qualifier" Aeson..= ES.toChars (Name.toElmString qual)
-                , "patterns" Aeson..= map encodeRagPattern patterns
-                ]
-            Src.PList patterns -> Aeson.object
-                [ "type" Aeson..= ("List" :: String)
-                , "patterns" Aeson..= map encodeRagPattern patterns
-                ]
-            Src.PCons p1 p2 -> Aeson.object
-                [ "type" Aeson..= ("Cons" :: String)
-                , "head" Aeson..= encodeRagPattern p1
-                , "tail" Aeson..= encodeRagPattern p2
-                ]
-            Src.PChr str -> Aeson.object
-                [ "type" Aeson..= ("Char" :: String)
-                , "value" Aeson..= ES.toChars str
-                ]
-            Src.PStr str -> Aeson.object
-                [ "type" Aeson..= ("String" :: String)
-                , "value" Aeson..= ES.toChars str
-                ]
-            Src.PInt i -> Aeson.object
-                [ "type" Aeson..= ("Int" :: String)
-                , "value" Aeson..= i
-                ]
+prettyRagAlias :: FilePath -> Src.Module -> A.Located Src.Alias -> String
+prettyRagAlias filePath modul (A.At region (Src.Alias name _ _)) =
+    let lineNumbers = getLineNumbers region
+        docstring = getDocstringFromRegion filePath region
+        imports = getImports modul
+    in unlines
+        [ "Type: TypeAlias"
+        , "Name: " ++ ES.toChars (Name.toElmString (A.toValue name))
+        , "Code: " ++ ES.toChars (Name.toElmString (A.toValue name))
+        , "Language: elm"
+        , "File: " ++ filePath
+        , "StartLine: " ++ show (fst lineNumbers)
+        , "EndLine: " ++ show (snd lineNumbers)
+        , "Calls: []"
+        , "Imports: " ++ show imports
+        , "Docstring: " ++ docstring
         ]
 
-
-encodeRagExpr :: Src.Expr -> Aeson.Value
-encodeRagExpr (A.At region expr_) =
-    Aeson.object
-        [ "type" Aeson..= ("Expression" :: String)
-        , "region" Aeson..= encodeRegion region
-        , "expression" Aeson..= case expr_ of
-            Src.Chr str -> Aeson.object
-                [ "type" Aeson..= ("Char" :: String)
-                , "value" Aeson..= ES.toChars str
-                ]
-            Src.Str str -> Aeson.object
-                [ "type" Aeson..= ("String" :: String)
-                , "value" Aeson..= ES.toChars str
-                ]
-            Src.Int i -> Aeson.object
-                [ "type" Aeson..= ("Int" :: String)
-                , "value" Aeson..= i
-                ]
-            Src.Float f -> Aeson.object
-                [ "type" Aeson..= ("Float" :: String)
-                , "value" Aeson..= BL.unpack (B.toLazyByteString (EF.toBuilder f))
-                ]
-            Src.Var _ name -> Aeson.object
-                [ "type" Aeson..= ("Var" :: String)
-                , "name" Aeson..= ES.toChars (Name.toElmString name)
-                ]
-            Src.VarQual _ name qual -> Aeson.object
-                [ "type" Aeson..= ("QualifiedVar" :: String)
-                , "name" Aeson..= ES.toChars (Name.toElmString name)
-                , "qualifier" Aeson..= ES.toChars (Name.toElmString qual)
-                ]
-            Src.List exprs -> Aeson.object
-                [ "type" Aeson..= ("List" :: String)
-                , "expressions" Aeson..= map encodeRagExpr exprs
-                ]
-            Src.Op name -> Aeson.object
-                [ "type" Aeson..= ("Operator" :: String)
-                , "name" Aeson..= ES.toChars (Name.toElmString name)
-                ]
-            Src.Negate expr -> Aeson.object
-                [ "type" Aeson..= ("Negate" :: String)
-                , "expression" Aeson..= encodeRagExpr expr
-                ]
-            Src.Binops exprs expr -> Aeson.object
-                [ "type" Aeson..= ("Binops" :: String)
-                , "expressions" Aeson..= map (\(e, op) -> Aeson.object
-                    [ "expression" Aeson..= encodeRagExpr e
-                    , "operator" Aeson..= ES.toChars (Name.toElmString (A.toValue op))
-                    ]) exprs
-                , "final" Aeson..= encodeRagExpr expr
-                ]
-            Src.Lambda patterns expr -> Aeson.object
-                [ "type" Aeson..= ("Lambda" :: String)
-                , "patterns" Aeson..= map encodeRagPattern patterns
-                , "expression" Aeson..= encodeRagExpr expr
-                ]
-            Src.Call func args -> Aeson.object
-                [ "type" Aeson..= ("Call" :: String)
-                , "function" Aeson..= encodeRagExpr func
-                , "arguments" Aeson..= map encodeRagExpr args
-                ]
-            Src.If branches expr -> Aeson.object
-                [ "type" Aeson..= ("If" :: String)
-                , "branches" Aeson..= map (\(cond, res) -> Aeson.object
-                    [ "condition" Aeson..= encodeRagExpr cond
-                    , "result" Aeson..= encodeRagExpr res
-                    ]) branches
-                , "else" Aeson..= encodeRagExpr expr
-                ]
-            Src.Let defs expr -> Aeson.object
-                [ "type" Aeson..= ("Let" :: String)
-                , "definitions" Aeson..= map encodeRagDef defs
-                , "expression" Aeson..= encodeRagExpr expr
-                ]
-            Src.Case expr branches -> Aeson.object
-                [ "type" Aeson..= ("Case" :: String)
-                , "expression" Aeson..= encodeRagExpr expr
-                , "branches" Aeson..= Aeson.Null  -- TODO: Add branch encoding
-                ]
-            Src.Accessor name -> Aeson.object
-                [ "type" Aeson..= ("Accessor" :: String)
-                , "name" Aeson..= ES.toChars (Name.toElmString name)
-                ]
-            Src.Access expr name -> Aeson.object
-                [ "type" Aeson..= ("Access" :: String)
-                , "expression" Aeson..= encodeRagExpr expr
-                , "name" Aeson..= ES.toChars (Name.toElmString (A.toValue name))
-                ]
-            Src.Update name fields -> Aeson.object
-                [ "type" Aeson..= ("Update" :: String)
-                , "name" Aeson..= ES.toChars (Name.toElmString (A.toValue name))
-                , "fields" Aeson..= Aeson.Null  -- TODO: Add field encoding
-                ]
-            Src.Record fields -> Aeson.object
-                [ "type" Aeson..= ("Record" :: String)
-                , "fields" Aeson..= map (\(n, e) -> Aeson.object
-                    [ "name" Aeson..= ES.toChars (Name.toElmString (A.toValue n))
-                    , "expression" Aeson..= encodeRagExpr e
-                    ]) fields
-                ]
-            Src.Unit -> Aeson.String "unit"
-            Src.Tuple e1 e2 es -> Aeson.object
-                [ "type" Aeson..= ("Tuple" :: String)
-                , "expressions" Aeson..= map encodeRagExpr (e1:e2:es)
-                ]
-            Src.Shader _ _ -> Aeson.String "<shader>"
+prettyRagPort :: FilePath -> Src.Module -> Src.Port -> String
+prettyRagPort filePath modul (Src.Port name _) =
+    let lineNumbers = getLineNumbers (A.toRegion name)
+        docstring = getDocstringFromRegion filePath (A.toRegion name)
+        imports = getImports modul
+    in unlines
+        [ "Type: Port"
+        , "Name: " ++ ES.toChars (Name.toElmString (A.toValue name))
+        , "Code: " ++ ES.toChars (Name.toElmString (A.toValue name))
+        , "Language: elm"
+        , "File: " ++ filePath
+        , "StartLine: " ++ show (fst lineNumbers)
+        , "EndLine: " ++ show (snd lineNumbers)
+        , "Calls: []"
+        , "Imports: " ++ show imports
+        , "Docstring: " ++ docstring
         ]
 
+getFilePath :: Src.Module -> String
+getFilePath modul = "test-files/program1/src/Main.elm"  -- TODO: Get actual file path from module
 
-encodeRagDef :: A.Located Src.Def -> Aeson.Value
-encodeRagDef (A.At region def) =
-    Aeson.object
-        [ "type" Aeson..= ("Definition" :: String)
-        , "region" Aeson..= encodeRegion region
-        , "definition" Aeson..= case def of
-            Src.Define name patterns e _ -> Aeson.object
-                [ "type" Aeson..= ("Define" :: String)
-                , "name" Aeson..= ES.toChars (Name.toElmString (A.toValue name))
-                , "patterns" Aeson..= map encodeRagPattern patterns
-                , "expression" Aeson..= encodeRagExpr e
-                ]
-            Src.Destruct pat e -> Aeson.object
-                [ "type" Aeson..= ("Destruct" :: String)
-                , "pattern" Aeson..= encodeRagPattern pat
-                , "expression" Aeson..= encodeRagExpr e
-                ]
-        ]
+getDocstringFromRegion :: FilePath -> A.Region -> String
+getDocstringFromRegion filePath region = unsafePerformIO $ do
+    let (A.Region (A.Position startLine _) _) = region
+    content <- readFile filePath
+    let lines = splitOn "\n" content
+    let docstring = findDocstring lines (fromIntegral startLine)
+    return docstring
 
+findDocstring :: [String] -> Int -> String
+findDocstring lines targetLine =
+    let beforeLines = take (targetLine - 1) lines
+        -- Find the last line that starts a docstring
+        startIdx = case findIndex (isDocstringStart . snd) (zip [0..] (reverse beforeLines)) of
+            Just idx -> length beforeLines - idx - 1
+            Nothing -> -1
+    in if startIdx == -1 then ""
+       else let rest = drop startIdx beforeLines
+                docBlock = takeWhileInclusive (not . isDocstringEnd) rest
+                docString = unlines docBlock
+            in extractDocstring docString
 
-encodeRagUnion :: Src.Union -> Aeson.Value
-encodeRagUnion (Src.Union name vars ctors) =
-    Aeson.object
-        [ "type" Aeson..= ("Type" :: String)
-        , "name" Aeson..= ES.toChars (Name.toElmString (A.toValue name))
-        , "variables" Aeson..= map (ES.toChars . Name.toElmString . A.toValue) vars
-        , "constructors" Aeson..= map (\(ctorName, types) -> Aeson.object
-            [ "name" Aeson..= ES.toChars (Name.toElmString (A.toValue ctorName))
-            , "types" Aeson..= map encodeRagType types
-            ]) ctors
-        ]
+isDocstringStart :: String -> Bool
+isDocstringStart line = (dropWhile (== ' ') line) =~ ("^\\{-\\|" :: String)
 
+isDocstringEnd :: String -> Bool
+isDocstringEnd line = (dropWhile (== ' ') line) =~ ("^-}\\s*$" :: String)
 
-encodeRagType :: Src.Type -> Aeson.Value
-encodeRagType (A.At region type_) =
-    Aeson.object
-        [ "type" Aeson..= ("Type" :: String)
-        , "region" Aeson..= encodeRegion region
-        , "type" Aeson..= case type_ of
-            Src.TLambda t1 t2 -> Aeson.object
-                [ "type" Aeson..= ("Lambda" :: String)
-                , "input" Aeson..= encodeRagType t1
-                , "output" Aeson..= encodeRagType t2
-                ]
-            Src.TVar name -> Aeson.object
-                [ "type" Aeson..= ("Var" :: String)
-                , "name" Aeson..= ES.toChars (Name.toElmString name)
-                ]
-            Src.TType _ name types -> Aeson.object
-                [ "type" Aeson..= ("Type" :: String)
-                , "name" Aeson..= ES.toChars (Name.toElmString name)
-                , "types" Aeson..= map encodeRagType types
-                ]
-            Src.TTypeQual _ name qual types -> Aeson.object
-                [ "type" Aeson..= ("QualifiedType" :: String)
-                , "name" Aeson..= ES.toChars (Name.toElmString name)
-                , "qualifier" Aeson..= ES.toChars (Name.toElmString qual)
-                , "types" Aeson..= map encodeRagType types
-                ]
-            Src.TRecord fields _ -> Aeson.object
-                [ "type" Aeson..= ("Record" :: String)
-                , "fields" Aeson..= map (\(n, t) -> Aeson.object
-                    [ "name" Aeson..= ES.toChars (Name.toElmString (A.toValue n))
-                    , "type" Aeson..= encodeRagType t
-                    ]) fields
-                ]
-            Src.TUnit -> Aeson.String "unit"
-            Src.TTuple t1 t2 ts -> Aeson.object
-                [ "type" Aeson..= ("Tuple" :: String)
-                , "types" Aeson..= map encodeRagType (t1:t2:ts)
-                ]
-        ]
+takeWhileInclusive :: (a -> Bool) -> [a] -> [a]
+takeWhileInclusive _ [] = []
+takeWhileInclusive p (x:xs) = x : if p x then takeWhileInclusive p xs else []
 
+extractDocstring :: String -> String
+extractDocstring str =
+    case str =~ ("\\{-\\|(.*)-\\}" :: String) :: (String, String, String, [String]) of
+        (_, _, _, [doc]) -> trimDocstring doc
+        _ -> ""
 
-encodeRagAlias :: Src.Alias -> Aeson.Value
-encodeRagAlias (Src.Alias name vars type_) =
-    Aeson.object
-        [ "type" Aeson..= ("TypeAlias" :: String)
-        , "name" Aeson..= ES.toChars (Name.toElmString (A.toValue name))
-        , "variables" Aeson..= map (ES.toChars . Name.toElmString . A.toValue) vars
-        , "type" Aeson..= encodeRagType type_
-        ]
+trimDocstring :: String -> String
+trimDocstring doc =
+    let lines = splitOn "\n" doc
+        trimmedLines = map (dropWhile (== ' ')) lines
+    in unlines trimmedLines
 
+getCalls :: Src.Expr -> [String]
+getCalls (A.At _ expr_) = case expr_ of
+    Src.Call (A.At _ (Src.Var _ name)) _ -> [ES.toChars (Name.toElmString name)]
+    Src.Call (A.At _ (Src.VarQual _ name _)) _ -> [ES.toChars (Name.toElmString name)]
+    _ -> []
 
-encodeRagPort :: Src.Port -> Aeson.Value
-encodeRagPort (Src.Port name type_) =
-    Aeson.object
-        [ "type" Aeson..= ("Port" :: String)
-        , "name" Aeson..= ES.toChars (Name.toElmString (A.toValue name))
-        , "type" Aeson..= encodeRagType type_
-        ]
+getImports :: Src.Module -> [String]
+getImports modul =
+    map (ES.toChars . Name.toElmString . A.toValue . Src._import) (Src._imports modul)
 
+getLineNumbers :: A.Region -> (Int, Int)
+getLineNumbers (A.Region (A.Position start _) (A.Position end _)) = (fromIntegral start, fromIntegral end)
 
-encodeRegion :: A.Region -> Aeson.Value
-encodeRegion (A.Region start end) =
-    Aeson.object
-        [ "start" Aeson..= encodePosition start
-        , "end" Aeson..= encodePosition end
-        ]
-
-
-encodePosition :: A.Position -> Aeson.Value
-encodePosition (A.Position line column) =
-    Aeson.object
-        [ "line" Aeson..= line
-        , "column" Aeson..= column
-        ]
-
-
-prettyRagJsonPretty :: Config -> Src.Module -> String
-prettyRagJsonPretty config modul =
-    BL.unpack $ AesonPretty.encodePretty $ encodeRagModule modul 
+prettyRaw :: Config -> Src.Module -> String
+prettyRaw _ _ = "-- raw AST pretty printing not implemented --"

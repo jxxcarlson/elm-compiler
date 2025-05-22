@@ -23,14 +23,21 @@ To play with it,
 
     --ast-json-pretty
         Print the raw AST of the Elm file in a pretty-printed JSON format suitable for RAG applications.
+
+    --rag
+        Print the AST in a RAG-friendly format with type, name, code, language, file path, line numbers, calls, imports, and docstring.
+
+    --rag-json
+        Print the AST in a RAG-friendly JSON format with type, name, code, language, file path, line numbers, calls, imports, and docstring.
+
+    --rag-json-pretty
+        Print the AST in a pretty-printed RAG-friendly JSON format with type, name, code, language, file path, line numbers, calls, imports, and docstring.
      ```
 
-  Try these options.  For example, in `test-files/project1`, do `elmx make --ast-json-pretty src/Main.elm`   
+  Try these options.  For example, in `test-files/project1`, do `elmx make --rag-json-pretty src/Main.elm`   
 
-**NOTE.** _The `ast-json` and `ast-json-pretty` options are intended to produce output for RAG servers.
-However, at the moment, they are just JSON versions of what you get with --ast-raw._
+**NOTE.** _The `ast-json` and `ast-json-pretty` options produce JSON versions of the raw AST output. The `rag`, `rag-json`, and `rag-json-pretty` options produce output in a format specifically designed for RAG applications, following this structure:_
 
-**Further Note.** _Here is what ChatGPT tells me is a typical RAG chunk:_
 ```
 {
   "type": "function",                 // "function", "class", "module", etc.
@@ -46,7 +53,6 @@ However, at the moment, they are just JSON versions of what you get with --ast-r
   "embedding": [0.123, -0.456, ...]  // Optional: precomputed vector embedding
 }
 ```
-The docstring should be useful for the intended application of talking to your codebase.
 
 **Final Note.** _At the moment (May 23), this repo is little more than a skeleton of what we are aiming for. Many elm constructs
 are rendered by placeholders.  These "holes" need to be filled in. Etc._
