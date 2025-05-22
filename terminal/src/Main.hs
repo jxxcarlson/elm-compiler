@@ -196,11 +196,11 @@ make =
         |-- flag "report" Make.reportType "You can say --report=json to get error messages as JSON. This is only really useful if you are an editor plugin. Humans should avoid it!"
         |-- flag "docs" Make.docsFile "Generate a JSON file of documentation for a package. Eventually it will be possible to preview docs with `reactor` because it is quite hard to deal with these JSON files directly."
         |-- onOff "ast" "Print the raw AST of the Elm file."
-        |-- onOff "ast-json" "Print the raw AST of the Elm file in a JSON format suitable for RAG applications."
-        |-- onOff "ast-json-pretty" "Print the raw AST of the Elm file in a pretty-printed JSON format suitable for RAG applications."
+        |-- onOff "ast-json" "Print the raw AST of the Elm file in a JSON format."
+        |-- onOff "ast-json-pretty" "As above, but easier for humans to read."
         |-- onOff "rag" "Print the AST in a RAG-friendly format with type, name, code, language, file path, line numbers, calls, imports, and docstring."
         |-- onOff "rag-json" "Print the AST in a RAG-friendly JSON format with type, name, code, language, file path, line numbers, calls, imports, and docstring."
-        |-- onOff "rag-json-pretty" "Print the AST in a pretty-printed RAG-friendly JSON format with type, name, code, language, file path, line numbers, calls, imports, and docstring."
+        |-- onOff "rag-json-pretty" "As above, but easier for humans to read."
   in
   Terminal.Command "make" Uncommon details example (zeroOrMore elmFile) makeFlags Make.run
 
