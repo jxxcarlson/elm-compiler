@@ -45,7 +45,7 @@ data Config =
 
 
 data OutputFormat
-    = AstRaw
+    = Ast
     | AstJson
     | AstJsonPretty
     | Rag
@@ -56,7 +56,7 @@ data OutputFormat
 defaultConfig :: Config
 defaultConfig =
     Config
-        { format = AstRaw
+        { format = Ast
         , showPlaceholders = True
         , indentSize = 2
         , maxLineLength = 80
@@ -66,7 +66,7 @@ defaultConfig =
 pretty :: Config -> FilePath -> Src.Module -> String
 pretty config filePath modul =
     case format config of
-        AstRaw -> prettyRaw config modul
+        Ast -> prettyRaw config modul
         AstJson -> prettyJson config modul
         AstJsonPretty -> prettyJsonPretty config modul
         Rag -> prettyRag config filePath modul

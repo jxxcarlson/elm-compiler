@@ -50,7 +50,7 @@ data Flags =
     , _output :: Maybe Output
     , _report :: Maybe ReportType
     , _docs :: Maybe FilePath
-    , _astRaw :: Bool
+    , _ast :: Bool
     , _astJson :: Bool
     , _astJsonPretty :: Bool
     , _rag :: Bool
@@ -80,7 +80,7 @@ type Task a = Task.Task Exit.Make a
 
 
 run :: [FilePath] -> Flags -> IO ()
-run paths flags@(Flags debug optimize output report docs astRaw astJson astJsonPretty rag ragJson ragJsonPretty) =
+run paths flags@(Flags debug optimize output report docs ast astJson astJsonPretty rag ragJson ragJsonPretty) =
   do  style <- getStyle report
       maybeRoot <- Stuff.findRoot
       Reporting.attemptWithStyle style Exit.makeToReport $
@@ -90,12 +90,12 @@ run paths flags@(Flags debug optimize output report docs astRaw astJson astJsonP
 
 
 runHelp :: FilePath -> [FilePath] -> Reporting.Style -> Flags -> IO (Either Exit.Make ())
-runHelp root paths style (Flags debug optimize maybeOutput _ maybeDocs astRaw astJson astJsonPretty rag ragJson ragJsonPretty) =
+runHelp root paths style (Flags debug optimize maybeOutput _ maybeDocs ast astJson astJsonPretty rag ragJson ragJsonPretty) =
   BW.withScope $ \scope ->
   Stuff.withRootLock root $ Task.run $
   do  desiredMode <- getMode debug optimize
       details <- Task.eio Exit.MakeBadDetails (Details.load style scope root)
-      if astRaw || astJson || astJsonPretty || rag || ragJson || ragJsonPretty
+      if ast || astJson || astJsonPretty || rag || ragJson || ragJsonPretty
         then do
           artifacts <- buildPaths style root details (NE.List (head paths) (tail paths))
           let moduleName = Name.fromChars $ FP.dropExtension $ FP.takeFileName (head paths)
@@ -111,7 +111,7 @@ runHelp root paths style (Flags debug optimize maybeOutput _ maybeDocs astRaw as
                         | rag = AST.Pretty.Raw.defaultConfig { AST.Pretty.Raw.format = AST.Pretty.Raw.Rag }
                         | astJsonPretty = AST.Pretty.Raw.defaultConfig { AST.Pretty.Raw.format = AST.Pretty.Raw.AstJsonPretty }
                         | astJson = AST.Pretty.Raw.defaultConfig { AST.Pretty.Raw.format = AST.Pretty.Raw.AstJson }
-                        | otherwise = AST.Pretty.Raw.defaultConfig
+                        | otherwise = AST.Pretty.Raw.defaultConfig { AST.Pretty.Raw.format = AST.Pretty.Raw.Ast }
                   let prettyOutput = AST.Pretty.Raw.pretty config (head paths) srcModule
                   Task.io $ putStrLn prettyOutput
                 Left err -> Task.throw $ Exit.MakeCannotBuild (Exit.BuildBadModules (head paths) (Error.Module (Name.fromChars $ FP.dropExtension $ FP.takeFileName (head paths)) (head paths) (File.zeroTime) (BS.empty) (Error.BadSyntax err)) [])
@@ -374,7 +374,7 @@ flags =
     , _output = Nothing
     , _report = Nothing
     , _docs = Nothing
-    , _astRaw = False
+    , _ast = False
     , _astJson = False
     , _astJsonPretty = False
     , _rag = False

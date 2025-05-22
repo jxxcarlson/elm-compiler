@@ -195,7 +195,7 @@ make =
         |-- flag "output" Make.output "Specify the name of the resulting JS file. For example --output=assets/elm.js to generate the JS at assets/elm.js or --output=/dev/null to generate no output at all!"
         |-- flag "report" Make.reportType "You can say --report=json to get error messages as JSON. This is only really useful if you are an editor plugin. Humans should avoid it!"
         |-- flag "docs" Make.docsFile "Generate a JSON file of documentation for a package. Eventually it will be possible to preview docs with `reactor` because it is quite hard to deal with these JSON files directly."
-        |-- onOff "ast-raw" "Print the raw AST of the Elm file."
+        |-- onOff "ast" "Print the raw AST of the Elm file."
         |-- onOff "ast-json" "Print the raw AST of the Elm file in a JSON format suitable for RAG applications."
         |-- onOff "ast-json-pretty" "Print the raw AST of the Elm file in a pretty-printed JSON format suitable for RAG applications."
         |-- onOff "rag" "Print the AST in a RAG-friendly format with type, name, code, language, file path, line numbers, calls, imports, and docstring."
