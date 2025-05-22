@@ -5,42 +5,33 @@ To play with it,
 
   - Clone this repo
   - cd into it and run `cabal build`
-  - Find the path to the binary and make an alias ls something like this,
-    `cd test-files/program1 && ../../dist-newstyle/build/aarch64-osx/ghc-9.6.7/elm-0.19.1/x/elm/build/elm/elm make --raw-ast src/Main.elm && cd -`
+  - Find the path to the binary and make an alias e.g.,
+    `alias elmx='/Users/carlson/dev/elm/hacking-ast-json/elm-compiler/dist-newstyle/build/aarch64-osx/ghc-9.6.7/elm-0.19.1/x/elm/build/elm/elm`
     where you use the correct path to the compiler
-  - Let's call the alias `test-ast`.  Then cd to the the root of the repo and run `test-ast` to see the output of the AST.
+  - Make a small Elm test project somewhere.  The repo has one at `test-files/program1`. Now cd into your project folder and run `elmx make --help`.
+    You should see this:
 
-At the moment (May 21), this repo is little more than a skeleton of what we are aiming for. See TODO list below)
+     ```
+     ...
+     
+     --raw-ast
+        Print the raw AST of the Elm file.
 
-See NOTES.md for additional details.
+    --rag-json
+        Print the raw AST of the Elm file in a JSON format suitable for RAG
+        applications.
 
-## TODO
+    --rag-json-pretty
+        Print the raw AST of the Elm file in a pretty-printed JSON format.
+     ```
 
-- Add much more detail to the output of --raw-ast. At the moment much of the output is given by placeholders.
-- Add location data, including range of line numbers so that the relevant source code can be accessed)
-- Add json output
-- Maybe do the canonical AST
+  Try these options.  For example, in `test-files/project1`, do `elmx make --rag-json-pretty src/Main.elm`   
 
-### Files added
 
-compiler/src/
-- AST/Pretty/Raw.hs
-- AST/Pretty/Json.hs
+At the moment (May 21), this repo is little more than a skeleton of what we are aiming for. Many elm constructs
+are rendered by placeholders.  These "holes" need to be filled in. Etc.
 
-## Files changed
 
-terminal/src/Make.hs
-
-## Files referenced
-
-- Data/Name.hs -- use `toElmString`
-- Reporting/Annotation.hs -- `toValue` which extracts the vlaue from a `Located` type:
-
-  ```
-  data Located a =
-    At Region a
-  ```
-**Note.** I need to check and update the File data above.
 
 # Elm
 
