@@ -46,7 +46,7 @@ However, at the moment, they are just JSON versions of what you get with --raw-a
   "embedding": [0.123, -0.456, ...]  // Optional: precomputed vector embedding
 }
 ```
-The docstring should be useful for the intenden application of talking to your codebase.
+The docstring should be useful for the intended application of talking to your codebase.
 
 **Final Note.** _At the moment (May 23), this repo is little more than a skeleton of what we are aiming for. Many elm constructs
 are rendered by placeholders.  These "holes" need to be filled in. Etc._
