@@ -10,7 +10,7 @@ output of the raw AST of an Elm program. Below is an example.  To run it, procee
     Let's call the alias `elmx`
   - `cd test-files/program1 && elmx make --ast src/Main.elm`
 
-You should get output listed in the next section.  For other command-line options
+You should get the output listed in the next section.  For other command-line options
 say `elmx make --help`.
 
 This is an experimental project. At the moment, only a small number of elements
