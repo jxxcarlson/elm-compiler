@@ -1,43 +1,69 @@
 #  Fork: AST output
 
-This is a fork of the Elm compiler, an experiment in producing human-readble output of the raw AST.
-To play with it, 
+This is a fork of the Elm compiler, an experiment in producing both human and machine-readble 
+output of the raw AST. Below is an example.  To run it, proceed as follows:
 
-  - Clone this repo
-  - cd into it and run `cabal build`
-  - Find the path to the binary and make an alias e.g.,
-    `alias elmx='/Users/carlson/dev/elm/hacking-ast-json/elm-compiler/dist-newstyle/build/aarch64-osx/ghc-9.6.7/elm-0.19.1/x/elm/build/elm/elm`
-    where you use the correct path to the compiler
-  - Make a small Elm test project somewhere.  The repo has one at `test-files/program1`. Now cd into your project folder and run `elmx make --help`.
-    You should see this:
+  - clone this repo
+  - cd into the root of the project
+  - Build the compiler: run `cabal build`
+  - Make an alias of the binary. You will find the binary at `dist-newstyle/build/aarch64-osx/ghc-9.6.7/elm-0.19.1/x/elm/build/elm/elm`.
+    Let's call the alias `elmx`
+  - `cd test-files/program1 && elmx make --ast src/Main.elm`
 
-     ```
-     ...
-     
-    --ast
-        Print the raw AST of the Elm file.
+You should get output as below.  For other command-line options
+say `elmx make --help`.
 
-    --ast-json
-        Print the raw AST of the Elm file in a JSON format.
+This is an experimental project. At the moment, only a small number of elements
+of the AST are handled.  Much work needed!
 
-    --ast-json-pretty
-        As above, but easier for humans to read.
+**Output for test-files/program1**
 
-    --rag
-        Print the AST in a RAG-friendly format with type, name, code, language,
-        file path, line numbers, calls, imports, and docstring.
+```
+➜  program1 git:(master) elmx make --ast src/Main.elm
+Success! Compiled 1 module.
+Module: Main
 
-    --rag-json
-        Print the AST in a RAG-friendly JSON format with type, name, code,
-        language, file path, line numbers, calls, imports, and docstring.
+Imports:
+  Platform.Sub
+  Platform.Cmd
+  Platform
+  Tuple
+  Char
+  String
+  Result
+  Maybe
+  List
+  Debug
+  Basics
+  Html
 
-    --rag-json-pretty
-        As above, but easier for humans to read.
-     ```
+Values:
+[Function] main with patterns:  = [30:5-30:25] [30:5-30:9] text [30:10-30:25] "Hello, World!"
 
-  Try these options.  For example, in `test-files/project1`, do `elmx make --rag-json-pretty src/Main.elm`   
+[Function] inc with patterns: [20:5-20:6] x = [21:5-25:14] let [22:9-23:14] delta  = [23:13-23:14] 2 in [25:5-25:14] [25:5-25:6] x + [25:9-25:14] delta
 
-**NOTE.** _The `ast-json` and `ast-json-pretty` options produce JSON versions of the raw AST output. The `rag`, `rag-json`, and `rag-json-pretty` options produce output in a format specifically designed for RAG applications, following this structure:_
+[Function] agent with patterns:  = [16:9-16:20] [16:9-16:11] AI [16:12-16:20] "Claude"
+
+Types:
+[Type] [13:6-13:11] Agent
+  [13:14-13:19] Human String
+  [13:29-13:31] AI String
+  [13:41-13:46] Alien
+
+[Type] [9:6-9:12] Result error value
+  [10:7-10:9] Ok value
+  [11:7-11:10] Err error
+
+[Type] [5:6-5:11] Maybe a
+  [6:7-6:11] Just a
+  [7:7-7:14] Nothing
+
+Type Aliases:
+Ports:
+```
+
+
+**NOTES.** The `rag`, `rag-json`, and `rag-json-pretty` options produce output in a format specifically designed for RAG applications. They follow this structure:_
 
 ```
 {
@@ -54,10 +80,6 @@ To play with it,
   "embedding": [0.123, -0.456, ...]  // Optional: precomputed vector embedding
 }
 ```
-
-**Final Note.** _At the moment (May 23), this repo is little more than a skeleton of what we are aiming for. Many elm constructs
-are rendered by placeholders.  These "holes" need to be filled in. Etc._
-
 
 
 # Elm
