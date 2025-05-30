@@ -1,7 +1,7 @@
 #  Fork: AST output
 
 This is a fork of the Elm compiler, an experiment in producing both human and machine-readble 
-output of the raw AST. Below is an example.  To run it, proceed as follows:
+output of the raw AST of an Elm program. Below is an example.  To run it, proceed as follows:
 
   - clone this repo
   - cd into the root of the project
@@ -10,13 +10,15 @@ output of the raw AST. Below is an example.  To run it, proceed as follows:
     Let's call the alias `elmx`
   - `cd test-files/program1 && elmx make --ast src/Main.elm`
 
-You should get output as below.  For other command-line options
+You should get output listed in the next section.  For other command-line options
 say `elmx make --help`.
 
 This is an experimental project. At the moment, only a small number of elements
 of the AST are handled.  Much work needed!
 
-**Output for test-files/program1**
+## Example
+
+### Output for test-files/program1
 
 ```
 ➜  program1 git:(master) elmx make --ast src/Main.elm
@@ -61,7 +63,40 @@ Types:
 Type Aliases:
 Ports:
 ```
+### test-files/program1/src/Main.elm
 
+```
+module Main exposing (main, inc, Maybe(..), Result(..))
+
+import Html exposing (text)
+
+type Maybe a
+    = Just a
+    | Nothing
+
+type Result error value
+    = Ok value
+    | Err error
+
+type Agent = Human String | AI String | Alien
+
+{-| The agent who will work with you-}
+agent = AI "Claude"
+
+{-| A weird inc function -}
+inc : Int -> Int
+inc x =
+    let
+        delta =
+            2
+    in
+    x + delta
+
+{-| Entry point for the program -}
+main : Html.Html msg
+main =
+    text "Hello, World!"
+```
 
 **NOTES.** The `rag`, `rag-json`, and `rag-json-pretty` options produce output in a format specifically designed for RAG applications. They follow this structure:_
 
