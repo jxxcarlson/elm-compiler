@@ -21,7 +21,6 @@ of the AST are handled.  Much work needed!
 ### Output for test-files/program1
 
 ```
-➜  program1 git:(master) elmx make --ast src/Main.elm
 Success! Compiled 1 module.
 Module: Main
 
@@ -40,25 +39,17 @@ Imports:
   Html
 
 Values:
-[Function] main with patterns:  = [30:5-30:25] [30:5-30:9] text [30:10-30:25] "Hello, World!"
+[Function] main with patterns:  = [23:5-23:25] [23:5-23:9] text [23:10-23:25] "Hello, World!"
 
-[Function] inc with patterns: [20:5-20:6] x = [21:5-25:14] let [22:9-23:14] delta  = [23:13-23:14] 2 in [25:5-25:14] [25:5-25:6] x + [25:9-25:14] delta
+[Function] inc with patterns: [13:5-13:6] x = [14:5-18:14] let [15:9-16:14] delta  = [16:13-16:14] 2 in [18:5-18:14] [18:5-18:6] x + [18:9-18:14] delta
 
-[Function] agent with patterns:  = [16:9-16:20] [16:9-16:11] AI [16:12-16:20] "Claude"
+[Function] agent with patterns:  = [9:9-9:20] [9:9-9:11] AI [9:12-9:20] "Claude"
 
 Types:
-[Type] [13:6-13:11] Agent
-  [13:14-13:19] Human String
-  [13:29-13:31] AI String
-  [13:41-13:46] Alien
-
-[Type] [9:6-9:12] Result error value
-  [10:7-10:9] Ok value
-  [11:7-11:10] Err error
-
-[Type] [5:6-5:11] Maybe a
-  [6:7-6:11] Just a
-  [7:7-7:14] Nothing
+[Type] [6:6-6:11] Agent
+  [6:14-6:19] Human String
+  [6:29-6:31] AI String
+  [6:41-6:46] Alien
 
 Type Aliases:
 Ports:
@@ -66,17 +57,9 @@ Ports:
 ### test-files/program1/src/Main.elm
 
 ```
-module Main exposing (main, inc, Maybe(..), Result(..))
+module Main exposing (main, inc, Agent(..))
 
 import Html exposing (text)
-
-type Maybe a
-    = Just a
-    | Nothing
-
-type Result error value
-    = Ok value
-    | Err error
 
 type Agent = Human String | AI String | Alien
 
