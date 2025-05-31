@@ -39,7 +39,7 @@ Imports:
   Html
 
 Values:
-[Function] main with patterns:  = [23:5-23:25] [23:5-23:9] text [23:10-23:25] "Hello, World!"
+[Function] main with patterns:  = [23:5-23:61] [23:5-23:9] text <| [23:13-23:35] "Hello, World! Test: " ++ [23:39-23:60] [23:39-23:53] String.fromInt [23:55-23:60] [23:55-23:58] inc [23:59-23:60] 1
 
 [Function] inc with patterns: [13:5-13:6] x = [14:5-18:14] let [15:9-16:14] delta  = [16:13-16:14] 2 in [18:5-18:14] [18:5-18:6] x + [18:9-18:14] delta
 
@@ -61,6 +61,7 @@ module Main exposing (main, inc, Agent(..))
 
 import Html exposing (text)
 
+
 type Agent = Human String | AI String | Alien
 
 {-| The agent who will work with you-}
@@ -78,7 +79,7 @@ inc x =
 {-| Entry point for the program -}
 main : Html.Html msg
 main =
-    text "Hello, World!"
+    text <| "Hello, World! Test: " ++ String.fromInt (inc 1)
 ```
 
 **NOTES.** The `rag`, `rag-json`, and `rag-json-pretty` options produce output in a format specifically designed for RAG applications. They follow this structure:_
