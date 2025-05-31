@@ -61,7 +61,6 @@ module Main exposing (main, inc, Agent(..))
 
 import Html exposing (text)
 
-
 type Agent = Human String | AI String | Alien
 
 {-| The agent who will work with you-}
