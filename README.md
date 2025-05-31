@@ -7,11 +7,11 @@ output of the raw AST of an Elm program. Below is an example.  To run it, procee
   - cd into the root of the project
   - Build the compiler: run `cabal build`
   - Make an alias of the binary. You will find the binary at `dist-newstyle/build/aarch64-osx/ghc-9.6.7/elm-0.19.1/x/elm/build/elm/elm`.
-    Let's call the alias `elmx`
-  - `cd test-files/program1 && elmx make --ast src/Main.elm`
+    Let's call the alias `elma`
+  - `cd test-files/program1 && elma make --ast src/Main.elm`
 
 You should get the output listed in the next section.  For other command-line options
-say `elmx make --help`.
+say `elma make --help`.
 
 This is an experimental project. At the moment, only a small number of elements
 of the AST are handled.  Much work needed!
