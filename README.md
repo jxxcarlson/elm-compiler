@@ -13,8 +13,7 @@ output of the raw AST of an Elm program. Below is an example.  To run it, procee
 You should get the output listed in the next section.  For other command-line options
 say `elma make --help`.
 
-This is an experimental project. At the moment, only a small number of elements
-of the AST are handled.  Much work needed!
+This is an experimental project. Comments and suggestions of all kinds are welcome, including issues and pull requests.
 
 ## Example
 
