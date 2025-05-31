@@ -4433,9 +4433,15 @@ var $elm$virtual_dom$VirtualDom$toHandlerInt = function (handler) {
 			return 3;
 	}
 };
+var $author$project$Main$inc = function (x) {
+	var delta = 2;
+	return x + delta;
+};
 var $elm$virtual_dom$VirtualDom$text = _VirtualDom_text;
 var $elm$html$Html$text = $elm$virtual_dom$VirtualDom$text;
-var $author$project$Main$main = $elm$html$Html$text('Hello, World!');
+var $author$project$Main$main = $elm$html$Html$text(
+	'Hello, World! Test: ' + $elm$core$String$fromInt(
+		$author$project$Main$inc(1)));
 _Platform_export({'Main':{'init':_VirtualDom_init($author$project$Main$main)(0)(0)}});}(this));
 
   var app = Elm.Main.init({ node: document.getElementById("elm") });

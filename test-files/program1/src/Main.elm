@@ -20,4 +20,4 @@ inc x =
 {-| Entry point for the program -}
 main : Html.Html msg
 main =
-    text "Hello, World!" 
+    text <| "Hello, World! Test: " ++ String.fromInt (inc 1)

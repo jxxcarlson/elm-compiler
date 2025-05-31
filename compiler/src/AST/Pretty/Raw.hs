@@ -33,6 +33,9 @@ import Data.Maybe (mapMaybe)
 import qualified Data.Vector as V
 import qualified Data.Aeson.Key as AesonKey
 import Text.Regex.TDFA ((=~))
+import qualified Json.String
+import qualified Parse.Primitives as P
+import qualified Data.Map as Map
 
 
 data Config =
@@ -232,16 +235,188 @@ prettyJsonPretty config modul =
 
 encodeModule :: Src.Module -> Aeson.Value
 encodeModule modul =
-    Aeson.object
+    let (moduleDoc, declDocs) = extractDocs (Src._docs modul)
+    in Aeson.object
         [ "type" Aeson..= ("Module" :: String)
         , "name" Aeson..= ES.toChars (Name.toElmString (Src.getName modul))
-        , "values" Aeson..= map (encodeValue . A.toValue) (Src._values modul)
-        , "unions" Aeson..= map (encodeUnion . A.toValue) (Src._unions modul)
-        , "aliases" Aeson..= map (encodeAlias . A.toValue) (Src._aliases modul)
-        , "ports" Aeson..= map encodePort (getPorts modul)
+        , "moduleDoc" Aeson..= moduleDoc
+        , "values" Aeson..= map (encodeValueWithDoc declDocs modul) (Src._values modul)
+        , "unions" Aeson..= map (encodeUnionWithDoc declDocs modul) (Src._unions modul)
+        , "aliases" Aeson..= map (encodeAliasWithDoc declDocs modul) (Src._aliases modul)
+        , "ports" Aeson..= map (encodePortWithDoc declDocs) (getPorts modul)
         ]
 
 
+-- HELPER FUNCTIONS FOR EXTRACTING DOCS
+
+extractDocs :: Src.Docs -> (Maybe String, Map.Map Name.Name String)
+extractDocs docs =
+    case docs of
+        Src.NoDocs _ -> (Nothing, Map.empty)
+        Src.YesDocs moduleComment declComments ->
+            ( Just (commentToString moduleComment)
+            , Map.fromList [(name, commentToString comment) | (name, comment) <- declComments]
+            )
+
+
+commentToString :: Src.Comment -> String
+commentToString (Src.Comment snippet) =
+    Json.String.toChars (Json.String.fromComment snippet)
+
+
+-- ENCODING FUNCTIONS WITH DOCS
+
+encodeValueWithDoc :: Map.Map Name.Name String -> Src.Module -> A.Located Src.Value -> Aeson.Value
+encodeValueWithDoc docMap modul (A.At _ (Src.Value name patterns expr typeAnnotation)) =
+    let nameStr = A.toValue name
+        docstring = Map.lookup nameStr docMap
+    in Aeson.object
+        [ "type" Aeson..= ("Function" :: String)
+        , "name" Aeson..= ES.toChars (Name.toElmString nameStr)
+        , "docstring" Aeson..= docstring
+        , "patterns" Aeson..= map encodePattern patterns
+        , "expression" Aeson..= encodeExpr expr
+        , "typeAnnotation" Aeson..= fmap encodeType typeAnnotation
+        ]
+
+
+encodeUnionWithDoc :: Map.Map Name.Name String -> Src.Module -> A.Located Src.Union -> Aeson.Value
+encodeUnionWithDoc docMap modul (A.At _ (Src.Union name vars ctors)) =
+    let nameStr = A.toValue name
+        docstring = Map.lookup nameStr docMap
+    in Aeson.object
+        [ "type" Aeson..= ("Type" :: String)
+        , "name" Aeson..= ES.toChars (Name.toElmString nameStr)
+        , "docstring" Aeson..= docstring
+        , "typeVariables" Aeson..= map (ES.toChars . Name.toElmString . A.toValue) vars
+        , "constructors" Aeson..= map encodeConstructor ctors
+        ]
+
+
+encodeAliasWithDoc :: Map.Map Name.Name String -> Src.Module -> A.Located Src.Alias -> Aeson.Value
+encodeAliasWithDoc docMap modul (A.At _ (Src.Alias name vars tipe)) =
+    let nameStr = A.toValue name
+        docstring = Map.lookup nameStr docMap
+    in Aeson.object
+        [ "type" Aeson..= ("TypeAlias" :: String)
+        , "name" Aeson..= ES.toChars (Name.toElmString nameStr)
+        , "docstring" Aeson..= docstring
+        , "typeVariables" Aeson..= map (ES.toChars . Name.toElmString . A.toValue) vars
+        , "aliasType" Aeson..= encodeType tipe
+        ]
+
+
+encodePortWithDoc :: Map.Map Name.Name String -> Src.Port -> Aeson.Value
+encodePortWithDoc docMap (Src.Port name tipe) =
+    let nameStr = A.toValue name
+        docstring = Map.lookup nameStr docMap
+    in Aeson.object
+        [ "type" Aeson..= ("Port" :: String)
+        , "name" Aeson..= ES.toChars (Name.toElmString nameStr)
+        , "docstring" Aeson..= docstring
+        , "portType" Aeson..= encodeType tipe
+        ]
+
+
+encodeConstructor :: (A.Located Name.Name, [Src.Type]) -> Aeson.Value
+encodeConstructor (name, types) =
+    Aeson.object
+        [ "name" Aeson..= ES.toChars (Name.toElmString (A.toValue name))
+        , "types" Aeson..= map encodeType types
+        ]
+
+
+encodePattern :: Src.Pattern -> Aeson.Value
+encodePattern (A.At region pattern_) =
+    Aeson.object $
+        ("location" Aeson..= encodeLocation region) :
+        case pattern_ of
+            Src.PAnything -> ["tag" Aeson..= ("PAnything" :: String)]
+            Src.PVar name -> ["tag" Aeson..= ("PVar" :: String), "name" Aeson..= ES.toChars (Name.toElmString name)]
+            Src.PRecord fields -> ["tag" Aeson..= ("PRecord" :: String), "fields" Aeson..= map (ES.toChars . Name.toElmString . A.toValue) fields]
+            Src.PAlias pat name -> ["tag" Aeson..= ("PAlias" :: String), "pattern" Aeson..= encodePattern pat, "name" Aeson..= ES.toChars (Name.toElmString (A.toValue name))]
+            Src.PUnit -> ["tag" Aeson..= ("PUnit" :: String)]
+            Src.PTuple p1 p2 ps -> ["tag" Aeson..= ("PTuple" :: String), "first" Aeson..= encodePattern p1, "second" Aeson..= encodePattern p2, "rest" Aeson..= map encodePattern ps]
+            Src.PCtor _ name patterns -> ["tag" Aeson..= ("PCtor" :: String), "name" Aeson..= ES.toChars (Name.toElmString name), "patterns" Aeson..= map encodePattern patterns]
+            Src.PCtorQual _ mod name patterns -> ["tag" Aeson..= ("PCtorQual" :: String), "module" Aeson..= ES.toChars (Name.toElmString mod), "name" Aeson..= ES.toChars (Name.toElmString name), "patterns" Aeson..= map encodePattern patterns]
+            Src.PList patterns -> ["tag" Aeson..= ("PList" :: String), "patterns" Aeson..= map encodePattern patterns]
+            Src.PCons p1 p2 -> ["tag" Aeson..= ("PCons" :: String), "head" Aeson..= encodePattern p1, "tail" Aeson..= encodePattern p2]
+            Src.PChr str -> ["tag" Aeson..= ("PChr" :: String), "char" Aeson..= ES.toChars str]
+            Src.PStr str -> ["tag" Aeson..= ("PStr" :: String), "string" Aeson..= ES.toChars str]
+            Src.PInt i -> ["tag" Aeson..= ("PInt" :: String), "int" Aeson..= i]
+
+
+encodeExpr :: Src.Expr -> Aeson.Value
+encodeExpr (A.At region expr_) =
+    Aeson.object $
+        ("location" Aeson..= encodeLocation region) :
+        case expr_ of
+            Src.Chr str -> ["tag" Aeson..= ("Chr" :: String), "char" Aeson..= ES.toChars str]
+            Src.Str str -> ["tag" Aeson..= ("Str" :: String), "string" Aeson..= ES.toChars str]
+            Src.Int i -> ["tag" Aeson..= ("Int" :: String), "int" Aeson..= i]
+            Src.Float f -> ["tag" Aeson..= ("Float" :: String), "float" Aeson..= show (BL.unpack (B.toLazyByteString (EF.toBuilder f)))]
+            Src.Var _ name -> ["tag" Aeson..= ("Var" :: String), "name" Aeson..= ES.toChars (Name.toElmString name)]
+            Src.VarQual _ mod name -> ["tag" Aeson..= ("VarQual" :: String), "module" Aeson..= ES.toChars (Name.toElmString mod), "name" Aeson..= ES.toChars (Name.toElmString name)]
+            Src.List exprs -> ["tag" Aeson..= ("List" :: String), "expressions" Aeson..= map encodeExpr exprs]
+            Src.Op name -> ["tag" Aeson..= ("Op" :: String), "name" Aeson..= ES.toChars (Name.toElmString name)]
+            Src.Negate expr -> ["tag" Aeson..= ("Negate" :: String), "expression" Aeson..= encodeExpr expr]
+            Src.Binops binops expr -> ["tag" Aeson..= ("Binops" :: String), "binops" Aeson..= map (\(e, op) -> Aeson.object ["expr" Aeson..= encodeExpr e, "op" Aeson..= ES.toChars (Name.toElmString (A.toValue op))]) binops, "expression" Aeson..= encodeExpr expr]
+            Src.Lambda patterns expr -> ["tag" Aeson..= ("Lambda" :: String), "patterns" Aeson..= map encodePattern patterns, "expression" Aeson..= encodeExpr expr]
+            Src.Call func args -> ["tag" Aeson..= ("Call" :: String), "function" Aeson..= encodeExpr func, "arguments" Aeson..= map encodeExpr args]
+            Src.If branches expr -> ["tag" Aeson..= ("If" :: String), "branches" Aeson..= map (\(cond, res) -> Aeson.object ["condition" Aeson..= encodeExpr cond, "result" Aeson..= encodeExpr res]) branches, "else" Aeson..= encodeExpr expr]
+            Src.Let defs expr -> ["tag" Aeson..= ("Let" :: String), "definitions" Aeson..= map encodeDef defs, "expression" Aeson..= encodeExpr expr]
+            Src.Case expr branches -> ["tag" Aeson..= ("Case" :: String), "expression" Aeson..= encodeExpr expr, "branches" Aeson..= map (\(pat, res) -> Aeson.object ["pattern" Aeson..= encodePattern pat, "result" Aeson..= encodeExpr res]) branches]
+            Src.Accessor name -> ["tag" Aeson..= ("Accessor" :: String), "field" Aeson..= ES.toChars (Name.toElmString name)]
+            Src.Access expr name -> ["tag" Aeson..= ("Access" :: String), "expression" Aeson..= encodeExpr expr, "field" Aeson..= ES.toChars (Name.toElmString (A.toValue name))]
+            Src.Update name fields -> ["tag" Aeson..= ("Update" :: String), "record" Aeson..= ES.toChars (Name.toElmString (A.toValue name)), "fields" Aeson..= map (\(n, e) -> Aeson.object ["name" Aeson..= ES.toChars (Name.toElmString (A.toValue n)), "value" Aeson..= encodeExpr e]) fields]
+            Src.Record fields -> ["tag" Aeson..= ("Record" :: String), "fields" Aeson..= map (\(n, e) -> Aeson.object ["name" Aeson..= ES.toChars (Name.toElmString (A.toValue n)), "value" Aeson..= encodeExpr e]) fields]
+            Src.Unit -> ["tag" Aeson..= ("Unit" :: String)]
+            Src.Tuple e1 e2 es -> ["tag" Aeson..= ("Tuple" :: String), "first" Aeson..= encodeExpr e1, "second" Aeson..= encodeExpr e2, "rest" Aeson..= map encodeExpr es]
+            Src.Shader _ _ -> ["tag" Aeson..= ("Shader" :: String)]
+
+
+encodeDef :: A.Located Src.Def -> Aeson.Value
+encodeDef (A.At region def) =
+    Aeson.object $
+        ("location" Aeson..= encodeLocation region) :
+        case def of
+            Src.Define name patterns expr typeAnnotation ->
+                [ "tag" Aeson..= ("Define" :: String)
+                , "name" Aeson..= ES.toChars (Name.toElmString (A.toValue name))
+                , "patterns" Aeson..= map encodePattern patterns
+                , "expression" Aeson..= encodeExpr expr
+                , "typeAnnotation" Aeson..= fmap encodeType typeAnnotation
+                ]
+            Src.Destruct pattern expr ->
+                [ "tag" Aeson..= ("Destruct" :: String)
+                , "pattern" Aeson..= encodePattern pattern
+                , "expression" Aeson..= encodeExpr expr
+                ]
+
+
+encodeType :: Src.Type -> Aeson.Value
+encodeType (A.At region type_) =
+    Aeson.object $
+        ("location" Aeson..= encodeLocation region) :
+        case type_ of
+            Src.TLambda t1 t2 -> ["tag" Aeson..= ("TLambda" :: String), "from" Aeson..= encodeType t1, "to" Aeson..= encodeType t2]
+            Src.TVar name -> ["tag" Aeson..= ("TVar" :: String), "name" Aeson..= ES.toChars (Name.toElmString name)]
+            Src.TType _ name types -> ["tag" Aeson..= ("TType" :: String), "name" Aeson..= ES.toChars (Name.toElmString name), "args" Aeson..= map encodeType types]
+            Src.TTypeQual _ mod name types -> ["tag" Aeson..= ("TTypeQual" :: String), "module" Aeson..= ES.toChars (Name.toElmString mod), "name" Aeson..= ES.toChars (Name.toElmString name), "args" Aeson..= map encodeType types]
+            Src.TRecord fields ext -> ["tag" Aeson..= ("TRecord" :: String), "fields" Aeson..= map (\(n, t) -> Aeson.object ["name" Aeson..= ES.toChars (Name.toElmString (A.toValue n)), "type" Aeson..= encodeType t]) fields, "extension" Aeson..= fmap (ES.toChars . Name.toElmString . A.toValue) ext]
+            Src.TUnit -> ["tag" Aeson..= ("TUnit" :: String)]
+            Src.TTuple t1 t2 ts -> ["tag" Aeson..= ("TTuple" :: String), "first" Aeson..= encodeType t1, "second" Aeson..= encodeType t2, "rest" Aeson..= map encodeType ts]
+
+
+encodeLocation :: A.Region -> Aeson.Value
+encodeLocation (A.Region (A.Position startLine startCol) (A.Position endLine endCol)) =
+    Aeson.object
+        [ "start" Aeson..= Aeson.object ["line" Aeson..= startLine, "column" Aeson..= startCol]
+        , "end" Aeson..= Aeson.object ["line" Aeson..= endLine, "column" Aeson..= endCol]
+        ]
+
+
+-- Keep the old functions for backward compatibility
 encodeValue :: Src.Value -> Aeson.Value
 encodeValue (Src.Value name patterns expr _) =
     Aeson.object
